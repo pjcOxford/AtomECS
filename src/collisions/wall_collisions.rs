@@ -143,7 +143,7 @@ impl<T : SDF> Intersect for T {
     ) -> Option<Vector3<f64>> {
         let speed = atom_vel.norm();
         if speed == 0.0 {
-            eprintln!("Speed 0 atom");
+            // eprintln!("Speed 0 atom");
             return None;
         }
 
@@ -159,18 +159,18 @@ impl<T : SDF> Intersect for T {
             let distance_to_surface = self.signed_distance(&local_pos);
 
             if distance_to_surface < tolerance {
-                if distance_traveled + distance_to_surface < max_distance {
+                if distance_traveled + distance_to_surface < max_distance + tolerance {
                     return Some(current_pos);
                 }
                 else {
-                    eprintln!("Took too long to collide");
+                    // eprintln!("Took too long to collide");
                     return None;
                 }
             }
 
             distance_traveled += distance_to_surface;
         }
-        eprintln!("Too few steps for convergence. collision");
+        // eprintln!("Too few steps for convergence. collision");
         None
     }
 }
@@ -256,6 +256,7 @@ pub fn create_cosine_distribution(mut commands: Commands) {
     }
     let cosine_distribution = LambertianProbabilityDistribution::new(thetas, weights);
     commands.insert_resource::<LambertianProbabilityDistribution>(cosine_distribution);
+    println!("Cosine distribution created!")
 }
 
 /// Diffuse collision (Lambertian)
@@ -288,7 +289,6 @@ fn collision_check<T: Volume + Intersect + Normal>(
     tolerance: f64, 
     max_steps: i32,
 ) -> Option<CollisionInfo> {
-
     let (atom_entity, atom_pos, atom_vel) = atom;
     let (wall_entity, shape, wall_data, wall_pos) = wall;
 
@@ -329,19 +329,21 @@ fn do_wall_collision(
     collision: &CollisionInfo,
     distribution: &LambertianProbabilityDistribution,
     dt: f64,
+    tolerance: f64,
 ) -> f64 {
-    let (mut atom_pos, mut atom_vel, mut distance) = atom;
+    let (atom_pos, atom_vel, distance) = atom;
 
     // subtract distance traveled to the collision point from previous position
     let traveled = ((atom_pos.pos - atom_vel.vel*dt) - collision.collision_point).norm();
     distance.distance_to_travel -= traveled;
-    if distance.distance_to_travel < 0.0 {
+    if - distance.distance_to_travel > tolerance {
         distance.distance_to_travel = 0.0;
-        eprintln!("Distance to travel set to a negative value somehow");
+        // eprintln!("Distance to travel set to a negative value somehow");
     }
 
     // do collision
-    atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel);
+    atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, &distribution);
+    // atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel);
 
     if distance.distance_to_travel > 0.0 {
         // propagate along chosen direction
@@ -349,8 +351,7 @@ fn do_wall_collision(
     } else {
         atom_pos.pos = collision.collision_point;
     }
-
-    //Return time used
+    // Return time used
     traveled / atom_vel.vel.norm()
 }
 
@@ -388,7 +389,8 @@ pub fn wall_collision_system<T: Volume + Component + Intersect + Normal>(
         .batching_strategy(batch_strategy.0.clone())
         .for_each(|(atom, mut pos, mut vel, mut distance)| {
             let mut dt_atom = dt;
-            while distance.distance_to_travel > 0.0 { 
+            let mut num_of_collisions = 0;
+            while distance.distance_to_travel > 0.0 && num_of_collisions < 10{ 
                 let mut collided = false;
 
                 for (wall, shape, wall_volume, wall_pos) in &walls {
@@ -400,21 +402,20 @@ pub fn wall_collision_system<T: Volume + Component + Intersect + Normal>(
                         max_steps,
                     ) {
                         // Handle the collision
-                        let time_used = do_wall_collision((&mut pos, &mut vel, &mut distance), &collision_info, &distribution, dt_atom);
+                        let time_used = do_wall_collision((&mut pos, &mut vel, &mut distance), &collision_info, &distribution, dt_atom, tolerance);
                         collided = true;
                         dt_atom -= time_used;
                         if dt_atom < 0.0 {
                             dt_atom = 0.0;
-                            eprintln!("Time set to a negative value somehow, wall collision system")
+                            // eprintln!("Time set to a negative value somehow, wall collision system");
                         }
                     }
                 }
-
+                
                 if !collided {
-                    // No collision detected with any wall, so no more distance to travel
-                    distance.distance_to_travel = 0.0;
                     break;
                 }
+                num_of_collisions += 1;
             }
         });
 }
@@ -904,7 +905,8 @@ mod tests {
         fn test_system(
             mut query: Query<(Entity, &mut Position, &mut Velocity, &mut DistanceToTravel)>,
             wall: Query<Entity, With<Wall>>,
-            distribution: Res<LambertianProbabilityDistribution>,) {
+            distribution: Res<LambertianProbabilityDistribution>,
+            tolerance: Res<SurfaceThreshold>) {
             query.iter_mut().for_each(|(atom, mut atom_pos, mut atom_vel, mut distance)| {
                 for wall in wall.iter() {
                     let dt = 1.0; // If you change this make sure to change the dt above as well
@@ -916,13 +918,14 @@ mod tests {
                         collision_point,
                         collision_normal,
                     };
-                    let time_used = do_wall_collision((&mut atom_pos, &mut atom_vel, &mut distance), &collision_info, &distribution, dt);
+                    let time_used = do_wall_collision((&mut atom_pos, &mut atom_vel, &mut distance), &collision_info, &distribution, dt, tolerance.0);
                     assert_approx_eq!(time_used, ((atom_pos.pos - atom_vel.vel*dt) - collision_point).norm()/atom_vel.vel.norm())
                 }
             });
         }
         app.add_systems(Startup, create_cosine_distribution);
         app.add_systems(Update, test_system);
+        app.world_mut().insert_resource(SurfaceThreshold(1e-9));
         app.update();
 
         let new_velocity = app.world()
@@ -956,47 +959,45 @@ mod tests {
     //// Needs to be changed to work with any reflection. 
     //// But with only specular reflection it does work 
     //// Will also fail as is because OldForces Force element is private
-    // #[test]
-    // fn test_systems() {
-    //     use crate::integrator::{IntegrationPlugin, IntegrationSet, Timestep, AtomECSBatchStrategy, OldForce};
-    //     use crate::initiate::NewlyCreated;
-    //     use crate::atom::{Force, Mass};
+    #[test]
+    fn test_systems() {
+        use crate::integrator::{IntegrationPlugin, IntegrationSet, Timestep, AtomECSBatchStrategy, OldForce};
+        use crate::initiate::NewlyCreated;
+        use crate::atom::{Force, Mass};
+        use crate::collisions::ApplyAtomCollisions;
+        use crate::collisions::CollisionPlugin;
 
-    //     let mut app = App::new();
-    //     app.world_mut()
-    //         .spawn(Wall{volume_type: VolumeType::Inclusive})
-    //         .insert(MyCuboid{half_width: Vector3::new(1.0, 1.0, 1.0)})
-    //         .insert(Position{pos: Vector3::new(0.0, 0.0, 0.0)});
-    //     let atom = app.world_mut()
-    //         .spawn(Atom)
-    //         .insert(Position{pos: Vector3::new(-1.0, 0.0, 0.0)})
-    //         .insert(Velocity{vel: Vector3::new(5.0, -5.0, 0.0)})
-    //         .insert(NewlyCreated)
-    //         .insert(Force::default())
-    //         .insert(Mass { value: 1.0 })
-    //         .insert(OldForce(Force::default()))
-    //         .id();
-    //     app.add_plugins(IntegrationPlugin);
-    //     app.insert_resource(Timestep {delta: 1.0});
-    //     app.insert_resource(MaxSteps(1000));
-    //     app.insert_resource(SurfaceThreshold(1e-9));
-    //     app.insert_resource(AtomECSBatchStrategy::default());
-    //     app.add_systems(PreUpdate, init_distance_to_travel_system.before(IntegrationSet::BeginIntegration));
-    //     app.add_systems(Update, wall_collision_system::<MyCuboid>);
-    //     app.add_systems(PostUpdate, reset_distance_to_travel_system);
-    //     app.update();
+        let mut app = App::new();
+        app.world_mut()
+            .spawn(Wall{volume_type: VolumeType::Inclusive})
+            .insert(MyCuboid{half_width: Vector3::new(1.0, 1.0, 1.0)})
+            .insert(Position{pos: Vector3::new(0.0, 0.0, 0.0)});
+        let atom = app.world_mut()
+            .spawn(Atom)
+            .insert(Position{pos: Vector3::new(-1.0, 0.0, 0.0)})
+            .insert(Velocity{vel: Vector3::new(5.0, -5.0, 0.0)})
+            .insert(NewlyCreated)
+            .insert(Force::default())
+            .insert(Mass { value: 1.0 })
+            .insert(OldForce(Force::default()))
+            .id();
+        app.add_plugins(IntegrationPlugin);
+        app.add_plugins(CollisionPlugin);
+        app.world_mut().insert_resource(ApplyAtomCollisions(false));
+        app.world_mut().insert_resource(Timestep {delta: 1.0});
+        app.update();
 
-    //     let new_position = app.world()
-    //         .entity(atom)
-    //         .get::<Position>()
-    //         .expect("Entity not found")
-    //         .pos;
+        let new_position = app.world()
+            .entity(atom)
+            .get::<Position>()
+            .expect("Entity not found")
+            .pos;
 
-    //     println!("{}", new_position);
-    //     assert_approx_eq!(new_position[0], 0.0, 10*TOLERANCE);
-    //     assert_approx_eq!(new_position[1], -1.0, 10*TOLERANCE);
-    //     assert_approx_eq!(new_position[2], 0.0, 10*TOLERANCE);
-    // }
+        println!("{}", new_position);
+        // assert_approx_eq!(new_position[0], 0.0, 10.0*TOLERANCE);
+        // assert_approx_eq!(new_position[1], -1.0, 10.0*TOLERANCE);
+        // assert_approx_eq!(new_position[2], 0.0, 10.0*TOLERANCE);
+    }
 }
 
 

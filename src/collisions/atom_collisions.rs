@@ -333,7 +333,6 @@ pub mod tests {
 
         let dt = 1.0;
         sim.world_mut().insert_resource(Timestep { delta: dt });
-        sim.world_mut().insert_resource(ApplyCollisionsOption{apply_collision: true});
         sim.world_mut().insert_resource(CollisionsTracker {
             num_collisions: Vec::new(),
             num_atoms: Vec::new(),
