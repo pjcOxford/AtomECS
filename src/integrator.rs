@@ -101,7 +101,7 @@ fn clear_force(mut query: Query<&mut Force>, batch_strategy: Res<AtomECSBatchStr
 
 /// Stores the value of the force calculation from the previous frame.
 #[derive(Component, Default)]
-pub struct OldForce(Force);
+pub struct OldForce(pub Force);
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum IntegrationSet {

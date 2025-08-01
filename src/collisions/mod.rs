@@ -20,15 +20,11 @@ use rand::Rng;
 
 /// A resource that indicates that the simulation should apply atom collisions
 #[derive(Resource)]
-pub struct ApplyAtomCollisions{
-    pub apply_atom_collision: bool,
-}
+pub struct ApplyAtomCollisions(bool);
 
 /// A resource that indicates that the simulation should apply wall collisions
 #[derive(Resource)]
-pub struct ApplyWallCollisions{
-    pub apply_wall_collision: bool,
-}
+pub struct ApplyWallCollisions(bool);
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum CollisionsSet {
@@ -38,18 +34,20 @@ pub enum CollisionsSet {
 }
 
 fn apply_atom_collisions(apply_atom_collision: Res<ApplyAtomCollisions>) -> bool {
-    apply_atom_collision.apply_atom_collision
+    apply_atom_collision.0
 }
 
 fn apply_wall_collisions(apply_wall_collision: Res<ApplyWallCollisions>) -> bool {
-    apply_wall_collision.apply_wall_collision
+    apply_wall_collision.0
 }
 
 pub struct CollisionPlugin;
 impl Plugin for CollisionPlugin {
     fn build(&self, app: &mut App) {
-        app.world_mut().insert_resource(ApplyAtomCollisions {apply_atom_collision: true});
-        app.world_mut().insert_resource(ApplyWallCollisions {apply_wall_collision: true});
+        app.world_mut().insert_resource(ApplyAtomCollisions(true));
+        app.world_mut().insert_resource(ApplyWallCollisions(true));
+        app.world_mut().insert_resource(MaxSteps(1000));
+        app.world_mut().insert_resource(SurfaceThreshold(1e-9));
 
         // Atom Collision Systems
         // Note that the atom collisions system must be applied after the velocity integrator or it will violate conservation of energy and cause heating
