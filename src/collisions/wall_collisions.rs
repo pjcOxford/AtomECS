@@ -1,5 +1,6 @@
 /// Wall collision logic. Does not work with forces/accelertions, or multiple entities.
 
+use std::fmt;
 use bevy::prelude::*;
 use nalgebra::Vector3;
 use rand::Rng;
@@ -8,12 +9,14 @@ use crate::shapes::{
     Cylinder as MyCylinder,
     Cuboid as MyCuboid,
     Sphere as MySphere,
+    CylindricalPipe,
     Volume
 }; // Aliasing issues with bevy.
 use crate::atom::{Atom, Position, Velocity};
 use crate::integrator::{Timestep, AtomECSBatchStrategy};
 use crate::constant::PI;
 use super::LambertianProbabilityDistribution;
+
 
 #[derive(Resource)]
 pub struct MaxSteps(pub i32); // Max steps for sdf convergence
@@ -31,16 +34,38 @@ pub enum VolumeType {
     Exclusive,
 }
 
+/// Enum for designating wall type for collisions
+pub enum WallType {
+    // Specular
+    Smooth,
+    // Diffuse
+    Rough,
+    // choose randomly between specular and diffuse. Probability of specular reflection.
+    Random {spec_prob: f64},
+}
+
 /// Struct to signify shape is a wall
 #[derive(Component)]
 #[component(storage = "SparseSet")]
 pub struct Wall{
     pub volume_type: VolumeType,
+    pub wall_type: WallType,
 }
 
 #[derive(Component)]
 pub struct DistanceToTravel {
     pub distance_to_travel: f64
+}
+
+#[derive(Component, Clone)]
+pub struct NumberOfWallCollisions {
+    pub value: i32
+}
+
+impl fmt::Display for NumberOfWallCollisions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.value)
+    }
 }
 
 pub struct CollisionInfo{
@@ -107,6 +132,30 @@ impl SDF for MyCuboid{
 /// Signed distance to a capped cylinder.
 /// `cyl_start` and `cyl_end` define the axis of the cylinder (centre of the caps).
 impl SDF for MyCylinder{
+    fn signed_distance(&self, point: &Vector3<f64>) -> f64 {
+        let cyl_start = -self.direction*self.length*0.5;
+        let local_point = point - cyl_start;
+
+        let point_dot_axis = local_point.dot(&self.direction);
+
+        let radial_dist = (local_point - self.direction * point_dot_axis).norm() - self.radius;
+
+        let axial_dist = (point_dot_axis - self.length * 0.5).abs() - self.length * 0.5;
+
+        let radial_sq = radial_dist * radial_dist;
+        let axial_sq = axial_dist * axial_dist;
+
+        let dist = if radial_dist.max(axial_dist) < 0.0 {
+            -radial_sq.min(axial_sq)
+        } else {
+            (if radial_dist > 0.0 { radial_sq } else { 0.0 }) + (if axial_dist > 0.0 { axial_sq } else { 0.0 })
+        };
+
+        dist.signum() * dist.abs().sqrt()
+    }
+}
+
+impl SDF for CylindricalPipe{
     fn signed_distance(&self, point: &Vector3<f64>) -> f64 {
         let cyl_start = -self.direction*self.length*0.5;
         let local_point = point - cyl_start;
@@ -230,6 +279,30 @@ impl Normal for MyCylinder {
     }
 }
 
+impl Normal for CylindricalPipe {
+    fn calculate_normal(&self, point: &Vector3<f64>, wall_pos: &Vector3<f64>, tolerance: f64) -> Option<Vector3<f64>> {
+        // Convert to local space
+        let rel = point - wall_pos;
+        let local = Vector3::new(
+            rel.dot(&self.perp_x),
+            rel.dot(&self.perp_y),
+            rel.dot(&self.direction),
+        );
+
+        // Gives the normal assuming collision from the inside
+        if (local.z.abs() - self.length*0.5).abs() < tolerance {
+            let normal = self.direction * local.z.signum();
+            Some(-normal.normalize()) 
+        } else if ((local.x.powf(2.0) + local.y.powf(2.0)).sqrt() - self.radius) < tolerance {
+            let normal = self.perp_x * local.x + self.perp_y * local.y;
+            Some(-normal.normalize()) 
+        }
+        else{
+            None
+        }
+    }
+}
+
 /// Specular reflection
 fn specular(
     collision_normal: &Vector3<f64>,
@@ -249,7 +322,7 @@ pub fn create_cosine_distribution(mut commands: Commands) {
     let n = 1000; // resolution over which to discretize `theta`.
     for i in 0..n {
         let theta = (i as f64) / (n as f64 + 1.0) * PI / 2.0;
-        let weight = theta.cos();
+        let weight = theta.cos()*theta.sin();
         thetas.push(theta);
         weights.push(weight);
         // Note: we can exclude d_theta because it is constant and the distribution will be normalized.
@@ -325,25 +398,38 @@ fn collision_check<T: Volume + Intersect + Normal>(
 
 /// Do wall collision
 fn do_wall_collision(
-    atom: (&mut Position, &mut Velocity, &mut DistanceToTravel),
+    atom: (&mut Position, &mut Velocity, &mut DistanceToTravel, &mut NumberOfWallCollisions),
+    wall: &Wall,
     collision: &CollisionInfo,
     distribution: &LambertianProbabilityDistribution,
     dt: f64,
     tolerance: f64,
 ) -> f64 {
-    let (atom_pos, atom_vel, distance) = atom;
-
+    let (atom_pos, atom_vel, distance, num_of_collisions) = atom;
+    num_of_collisions.value += 1;
     // subtract distance traveled to the collision point from previous position
     let traveled = ((atom_pos.pos - atom_vel.vel*dt) - collision.collision_point).norm();
     distance.distance_to_travel -= traveled;
     if - distance.distance_to_travel > tolerance {
         distance.distance_to_travel = 0.0;
-        // eprintln!("Distance to travel set to a negative value somehow");
+        eprintln!("Distance to travel set to a negative value somehow");
     }
 
     // do collision
-    atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, &distribution);
-    // atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel);
+    match wall.wall_type {
+        WallType::Smooth =>
+            {atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel);}
+        WallType::Rough =>
+            {atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, &distribution);}
+        WallType::Random{spec_prob} => {
+            if rand::rng().gen_bool(spec_prob) {
+                atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel);
+            } else {
+                atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, &distribution);
+            }
+        }
+        _ => panic!("Unknown wall type!")
+    };
 
     if distance.distance_to_travel > 0.0 {
         // propagate along chosen direction
@@ -368,11 +454,24 @@ pub fn init_distance_to_travel_system (
     }
 }
 
+/// Initializes number of wall collisions component
+pub fn init_number_of_collisions_system (
+    mut query: Query<(Entity, &Velocity), (With<Atom>, Without<NumberOfWallCollisions>)>,
+    mut commands: Commands,
+    timestep: Res<Timestep>,
+) {
+    for (atom_entity, vel) in query.iter_mut() {
+        commands.entity(atom_entity).insert(NumberOfWallCollisions {
+            value: 0
+        });
+    }
+}
+
 /// Do the collisions
 /// To be run after verlet integrate position
 pub fn wall_collision_system<T: Volume + Component + Intersect + Normal>(
     wall_query: Query<(Entity, &T, &Wall, &Position), Without<Atom>>,
-    mut atom_query: Query<(Entity, &mut Position, &mut Velocity, &mut DistanceToTravel), With<Atom>>,
+    mut atom_query: Query<(Entity, &mut Position, &mut Velocity, &mut DistanceToTravel, &mut NumberOfWallCollisions), With<Atom>>,
     batch_strategy: Res<AtomECSBatchStrategy>,
     timestep: Res<Timestep>,
     threshold: Res<SurfaceThreshold>, 
@@ -387,22 +486,29 @@ pub fn wall_collision_system<T: Volume + Component + Intersect + Normal>(
     atom_query
         .par_iter_mut()
         .batching_strategy(batch_strategy.0.clone())
-        .for_each(|(atom, mut pos, mut vel, mut distance)| {
+        .for_each(|(atom_entity, mut pos, mut vel, mut distance, mut collisions)| {
+
             let mut dt_atom = dt;
             let mut num_of_collisions = 0;
-            while distance.distance_to_travel > 0.0 && num_of_collisions < 10{ 
+
+            while distance.distance_to_travel > 0.0 && num_of_collisions < 1000 { 
                 let mut collided = false;
 
-                for (wall, shape, wall_volume, wall_pos) in &walls {
+                for (wall_entity, shape, wall, wall_pos) in &walls {
                     if let Some(collision_info) = collision_check(
-                        (atom, &pos, &vel),
-                        (*wall, *shape, *wall_volume, *wall_pos),
+                        (atom_entity, &pos, &vel),
+                        (*wall_entity, *shape, *wall, *wall_pos),
                         dt_atom,
                         tolerance,
                         max_steps,
                     ) {
                         // Handle the collision
-                        let time_used = do_wall_collision((&mut pos, &mut vel, &mut distance), &collision_info, &distribution, dt_atom, tolerance);
+                        let time_used = do_wall_collision((&mut pos, &mut vel, &mut distance, &mut collisions), 
+                            *wall,
+                            &collision_info, 
+                            &distribution, 
+                            dt_atom, 
+                            tolerance);
                         collided = true;
                         dt_atom -= time_used;
                         if dt_atom < 0.0 {
@@ -783,10 +889,14 @@ mod tests {
 
         let wall_pos1 = Position {pos: Vector3::new(0.0, 0.0, 0.0)};
         let sphere = MySphere{radius: 4.0 };
-        let wall_type = Wall {volume_type: VolumeType::Inclusive};
+        let wall_type = Wall {
+            volume_type: VolumeType::Inclusive,
+            wall_type: WallType::Smooth};
         let sphere_wall = app.world_mut()
             .spawn(wall_pos1.clone())
-            .insert(Wall {volume_type: VolumeType::Inclusive})
+            .insert(Wall {
+                volume_type: VolumeType::Inclusive,
+                wall_type: WallType::Smooth})
             .insert(MySphere{radius: 4.0 })
             .id();
 
@@ -818,10 +928,14 @@ mod tests {
 
         let wall_pos2 = Position {pos: Vector3::new(0.0, 0.0, 0.0)};
         let cuboid = MyCuboid{half_width: Vector3::new(4.0, 1.0, 1.0)};
-        let wall_type = Wall {volume_type: VolumeType::Inclusive};
+        let wall_type = Wall {
+            volume_type: VolumeType::Inclusive,
+            wall_type: WallType::Smooth};
         let cuboid_wall = app.world_mut()
             .spawn(wall_pos2.clone())
-            .insert(Wall {volume_type: VolumeType::Inclusive})
+            .insert(Wall {
+                volume_type: VolumeType::Inclusive,
+                wall_type: WallType::Smooth})
             .insert(MyCuboid{half_width: Vector3::new(4.0, 1.0, 1.0)})
             .id();
 
@@ -852,10 +966,14 @@ mod tests {
 
         let wall_pos3 = Position {pos: Vector3::new(0.0, 0.0, 0.0)};
         let cylinder = MyCylinder::new(1.0, 8.0, Vector3::new(1.0, 0.0, 0.0));
-        let wall_type = Wall {volume_type: VolumeType::Inclusive};
+        let wall_type = Wall {
+            volume_type: VolumeType::Inclusive,
+            wall_type: WallType::Smooth};
         let cylinder_wall = app.world_mut()
             .spawn(wall_pos3.clone())
-            .insert(Wall {volume_type: VolumeType::Inclusive})
+            .insert(Wall {
+                volume_type: VolumeType::Inclusive,
+                wall_type: WallType::Smooth})
             .insert(MyCylinder::new(1.0, 8.0, Vector3::new(1.0, 0.0, 0.0)))
             .id();
 
@@ -881,7 +999,7 @@ mod tests {
     #[test]
     fn test_do_wall_collision() {
         let mut app = App::new();
-        let dt = 1.0;
+        let dt = 1.0 - 1e-10;
         let position = Position {pos: Vector3::new(1.0, 1.0, 0.0)};
         let velocity = Velocity {vel: Vector3::new(2.0,2.0,0.0)};
         let length = velocity.vel.norm()*dt;
@@ -891,34 +1009,36 @@ mod tests {
             .insert(position.clone())
             .insert(velocity.clone())
             .insert(DistanceToTravel{distance_to_travel: length})
+            .insert(NumberOfWallCollisions{value: 0})
             .id();
-        let wall = app.world_mut().spawn(Wall { volume_type: VolumeType::Inclusive}).id();
+        let wall = app.world_mut().spawn(Wall {
+            volume_type: VolumeType::Inclusive,
+            wall_type: WallType::Smooth}).id();
         let collision_point = Vector3::new(0.0,0.0,0.0);
         let collision_normal = Vector3::new(-1.0,0.0,0.0);
-        let collision_info = CollisionInfo {
-            atom,
-            wall,
-            collision_point,
-            collision_normal,
-        };
 
         fn test_system(
-            mut query: Query<(Entity, &mut Position, &mut Velocity, &mut DistanceToTravel)>,
-            wall: Query<Entity, With<Wall>>,
+            mut query: Query<(Entity, &mut Position, &mut Velocity, &mut DistanceToTravel, &mut NumberOfWallCollisions)>,
+            wall: Query<(Entity, &Wall)>,
             distribution: Res<LambertianProbabilityDistribution>,
             tolerance: Res<SurfaceThreshold>) {
-            query.iter_mut().for_each(|(atom, mut atom_pos, mut atom_vel, mut distance)| {
-                for wall in wall.iter() {
-                    let dt = 1.0; // If you change this make sure to change the dt above as well
+            query.iter_mut().for_each(|(atom, mut atom_pos, mut atom_vel, mut distance, mut collisions)| {
+                for (wall_entity, wall) in wall.iter() {
+                    let dt = 1.0 - 1e-10; // If you change this make sure to change the dt above as well
                     let collision_point = Vector3::new(0.0,0.0,0.0);
                     let collision_normal = Vector3::new(-1.0,0.0,0.0);
                     let collision_info = CollisionInfo {
                         atom,
-                        wall,
+                        wall: wall_entity,
                         collision_point,
                         collision_normal,
                     };
-                    let time_used = do_wall_collision((&mut atom_pos, &mut atom_vel, &mut distance), &collision_info, &distribution, dt, tolerance.0);
+                    let time_used = do_wall_collision((&mut atom_pos, &mut atom_vel, &mut distance, &mut collisions), 
+                        wall,  
+                        &collision_info, 
+                        &distribution, 
+                        dt, 
+                        tolerance.0);
                     assert_approx_eq!(time_used, ((atom_pos.pos - atom_vel.vel*dt) - collision_point).norm()/atom_vel.vel.norm())
                 }
             });
@@ -943,22 +1063,26 @@ mod tests {
             .get::<DistanceToTravel>()
             .expect("Entity not found")
             .distance_to_travel;
+        let new_number_of_wall_collisions = app.world()
+            .entity(atom)
+            .get::<NumberOfWallCollisions>()
+            .expect("Entity not found")
+            .value;
             
         let time_used = ((position.pos - velocity.vel*dt) - collision_point).norm()/velocity.vel.norm();
         let distance_travelled = ((position.pos - velocity.vel*dt) - collision_point).norm();
 
         assert_ne!(new_velocity, velocity.vel);
+        assert_eq!(new_number_of_wall_collisions, 1);
         assert_approx_eq!(new_position[0], collision_point[0] + new_velocity[0]*(dt - time_used), 1e-15);
         assert_approx_eq!(new_position[1], collision_point[1] + new_velocity[1]*(dt - time_used), 1e-15);
         assert_approx_eq!(new_position[2], collision_point[2] + new_velocity[2]*(dt - time_used), 1e-15);
         assert_approx_eq!(distance.distance_to_travel - distance_travelled, new_distance, 1e-15);
     }
 
-    //// Test multiple collisions
-    //// Basically an integration test
-    //// Needs to be changed to work with any reflection. 
-    //// But with only specular reflection it does work 
-    //// Will also fail as is because OldForces Force element is private
+    // Test multiple collisions
+    // Basically an integration test
+    // Will also fail as is because OldForces Force element is private
     #[test]
     fn test_systems() {
         use crate::integrator::{IntegrationPlugin, IntegrationSet, Timestep, AtomECSBatchStrategy, OldForce};
@@ -969,13 +1093,15 @@ mod tests {
 
         let mut app = App::new();
         app.world_mut()
-            .spawn(Wall{volume_type: VolumeType::Inclusive})
+            .spawn(Wall{
+                volume_type: VolumeType::Inclusive,
+                wall_type: WallType::Smooth})
             .insert(MyCuboid{half_width: Vector3::new(1.0, 1.0, 1.0)})
             .insert(Position{pos: Vector3::new(0.0, 0.0, 0.0)});
         let atom = app.world_mut()
             .spawn(Atom)
             .insert(Position{pos: Vector3::new(-1.0, 0.0, 0.0)})
-            .insert(Velocity{vel: Vector3::new(5.0, -5.0, 0.0)})
+            .insert(Velocity{vel: Vector3::new(6.0, -6.0, 0.0)})
             .insert(NewlyCreated)
             .insert(Force::default())
             .insert(Mass { value: 1.0 })
@@ -994,9 +1120,9 @@ mod tests {
             .pos;
 
         println!("{}", new_position);
-        // assert_approx_eq!(new_position[0], 0.0, 10.0*TOLERANCE);
-        // assert_approx_eq!(new_position[1], -1.0, 10.0*TOLERANCE);
-        // assert_approx_eq!(new_position[2], 0.0, 10.0*TOLERANCE);
+        assert_approx_eq!(new_position[0], 0.0, 10.0*TOLERANCE);
+        assert_approx_eq!(new_position[1], -1.0, 10.0*TOLERANCE);
+        assert_approx_eq!(new_position[2], 0.0, 10.0*TOLERANCE);
     }
 }
 

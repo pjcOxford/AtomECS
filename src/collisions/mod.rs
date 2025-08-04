@@ -11,6 +11,7 @@ use crate::shapes::{
     Cylinder as MyCylinder,
     Cuboid as MyCuboid,
     Sphere as MySphere,
+    CylindricalPipe,
 };
 
 use rand;
@@ -20,11 +21,11 @@ use rand::Rng;
 
 /// A resource that indicates that the simulation should apply atom collisions
 #[derive(Resource)]
-pub struct ApplyAtomCollisions(bool);
+pub struct ApplyAtomCollisions(pub bool);
 
 /// A resource that indicates that the simulation should apply wall collisions
 #[derive(Resource)]
-pub struct ApplyWallCollisions(bool);
+pub struct ApplyWallCollisions(pub bool);
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, SystemSet)]
 pub enum CollisionsSet {
@@ -70,6 +71,9 @@ impl Plugin for CollisionPlugin {
             .run_if(apply_wall_collisions));
         app.add_systems(PreUpdate, init_distance_to_travel_system
             .in_set(CollisionsSet::WallCollisionSystems)
+            .run_if(apply_wall_collisions));        
+        app.add_systems(PreUpdate, init_number_of_collisions_system
+            .in_set(CollisionsSet::WallCollisionSystems)
             .run_if(apply_wall_collisions));
         app.add_systems(PreUpdate, reset_distance_to_travel_system
             .in_set(CollisionsSet::WallCollisionSystems)
@@ -83,6 +87,10 @@ impl Plugin for CollisionPlugin {
             .after(IntegrationSet::BeginIntegration)
             .run_if(apply_wall_collisions));
         app.add_systems(PreUpdate, wall_collision_system::<MyCylinder>
+            .in_set(CollisionsSet::WallCollisionSystems)
+            .after(IntegrationSet::BeginIntegration)
+            .run_if(apply_wall_collisions));
+        app.add_systems(PreUpdate, wall_collision_system::<CylindricalPipe>
             .in_set(CollisionsSet::WallCollisionSystems)
             .after(IntegrationSet::BeginIntegration)
             .run_if(apply_wall_collisions));
