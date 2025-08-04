@@ -132,12 +132,12 @@ pub struct Oven<T> where T : AtomCreator {
     pub direction: Vector3<f64>,
 
     /// Angular distribution for atoms emitted by the oven.
-    theta_distribution: WeightedProbabilityDistribution,
+    pub theta_distribution: WeightedProbabilityDistribution,
 
     /// The maximum angle theta at which atoms can be emitted from the oven. This can be constricted eg by a heat shield, or 'hot lip'.
     pub max_theta: f64,
 
-    phantom : PhantomData<T>
+    pub phantom : PhantomData<T>
 }
 impl<T> MaxwellBoltzmannSource for Oven<T> where T : AtomCreator {
     fn get_temperature(&self) -> f64 {
