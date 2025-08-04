@@ -35,7 +35,6 @@ pub struct AtomNumberToEmit {
 
 
 /// Calculates the number of atoms to emit per frame for fixed atoms-per-timestep ovens
-/// Not doing parallel iteration here, expect few ovens.
 pub fn emit_number_per_frame_system(
     mut query: Query<(&EmitNumberPerFrame, &mut AtomNumberToEmit)>,
 ) {
