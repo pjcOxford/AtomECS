@@ -12,27 +12,19 @@ use crate::shapes::{
     CylindricalPipe,
     Volume
 }; // Aliasing issues with bevy.
+use crate::constant::{PI, EXP};
 use crate::atom::{Atom, Position, Velocity};
-use crate::integrator::{Timestep, AtomECSBatchStrategy};
-use crate::constant::PI;
+use crate::integrator::{Timestep, AtomECSBatchStrategy,};
+use crate::initiate::NewlyCreated;
 use super::LambertianProbabilityDistribution;
 
+// let counter: i32 = 0; // Counter for debugging
 
 #[derive(Resource)]
 pub struct MaxSteps(pub i32); // Max steps for sdf convergence
 
 #[derive(Resource)]
 pub struct SurfaceThreshold(pub f64); // Minimum penetration for detecting a collision
-
-/// Stolen from sim_region.
-pub enum VolumeType {
-    /// Entities within the volume are accepted
-    /// Accounts for collision from the inside
-    Inclusive,
-    /// Entities outside the volume are accepted, entities within are rejected.
-    /// Accounts for collisions from the outside
-    Exclusive,
-}
 
 /// Enum for designating wall type for collisions
 pub enum WallType {
@@ -42,13 +34,14 @@ pub enum WallType {
     Rough,
     // choose randomly between specular and diffuse. Probability of specular reflection.
     Random {spec_prob: f64},
+    // choose randomly depending on a coefficient that is exponential in angle of incidence.
+    Exponential{value: f64},
 }
 
 /// Struct to signify shape is a wall
 #[derive(Component)]
 #[component(storage = "SparseSet")]
-pub struct Wall{
-    pub volume_type: VolumeType,
+pub struct WallData{
     pub wall_type: WallType,
 }
 
@@ -68,6 +61,13 @@ impl fmt::Display for NumberOfWallCollisions {
     }
 }
 
+#[derive(Component)]
+pub enum VolumeStatus{
+    Inside,
+    Outside,
+    Open,
+}
+
 pub struct CollisionInfo{
     pub atom: Entity,
     pub wall: Entity,
@@ -80,6 +80,15 @@ pub trait SDF {
     fn signed_distance(&self, point: &Vector3<f64>) -> f64;
 }
 
+pub trait Wall {
+    /// Collision check for open walls
+    fn preliminary_collision_check(&self, 
+        atom_position: &Vector3<f64>, 
+        atom_velocity: &Vector3<f64>, 
+        atom_location: &VolumeStatus,
+        wall_position: &Vector3<f64>, 
+        dt: f64) -> bool;
+}
 
 pub trait Intersect{
     /// Calculate intersection point between atom trajectory and shape and return point of intersection
@@ -155,30 +164,6 @@ impl SDF for MyCylinder{
     }
 }
 
-impl SDF for CylindricalPipe{
-    fn signed_distance(&self, point: &Vector3<f64>) -> f64 {
-        let cyl_start = -self.direction*self.length*0.5;
-        let local_point = point - cyl_start;
-
-        let point_dot_axis = local_point.dot(&self.direction);
-
-        let radial_dist = (local_point - self.direction * point_dot_axis).norm() - self.radius;
-
-        let axial_dist = (point_dot_axis - self.length * 0.5).abs() - self.length * 0.5;
-
-        let radial_sq = radial_dist * radial_dist;
-        let axial_sq = axial_dist * axial_dist;
-
-        let dist = if radial_dist.max(axial_dist) < 0.0 {
-            -radial_sq.min(axial_sq)
-        } else {
-            (if radial_dist > 0.0 { radial_sq } else { 0.0 }) + (if axial_dist > 0.0 { axial_sq } else { 0.0 })
-        };
-
-        dist.signum() * dist.abs().sqrt()
-    }
-}
-
 // Uses -velocity as direction, ignores effect of acceleration.
 impl<T : SDF> Intersect for T {
     fn calculate_intersect(
@@ -221,6 +206,62 @@ impl<T : SDF> Intersect for T {
         }
         // eprintln!("Too few steps for convergence. collision");
         None
+    }
+}
+
+impl Intersect for CylindricalPipe {
+    fn calculate_intersect(
+        &self,
+        atom_pos: &Vector3<f64>,
+        atom_vel: &Vector3<f64>,
+        wall_pos: &Vector3<f64>,
+        max_time: f64,
+        _tolerance: f64,
+        _max_steps: i32,
+    ) -> Option<Vector3<f64>> {
+        let previous_position = atom_pos - atom_vel * max_time;
+        let delta_previous = previous_position - wall_pos;
+        let delta_current = atom_pos - wall_pos;
+
+        let projection_previous = delta_previous.dot(&self.direction);
+        let orthogonal_previous = delta_previous - projection_previous * self.direction;
+        let projection_current = delta_current.dot(&self.direction);
+        let orthogonal_current = delta_current - projection_current * self.direction;
+
+        let a = (orthogonal_current - orthogonal_previous).norm_squared();
+        let b = 2.0 * orthogonal_previous.dot(&(&orthogonal_current - &orthogonal_previous));
+        let c = orthogonal_previous.norm_squared() - self.radius.powi(2);
+
+        // Solve quadratic equation for t
+        let discriminant = b * b - 4.0 * a * c;
+
+        if discriminant < 0.0 {
+            // No intersection, should never happen
+            return None;
+        }
+        let sqrt_discriminant = discriminant.sqrt();
+        let t1 = (-b + sqrt_discriminant) / (2.0 * a);
+        let t2 = (-b - sqrt_discriminant) / (2.0 * a);
+        if (t1 <= 0.0 || t1 >= 1.0 ) && (t2 <= 0.0 || t2 >= 1.0 ) {
+            return None;
+        }
+
+        let t = if t1 <= 0.0 || t1 >= 1.0  {
+            t2
+        } else if t2 <= 0.0 || t2 >= 1.0 {
+            t1
+        } else {
+            f64::min(t1, t2)
+        };
+
+        // Calculate the collision point
+        let mut collision_point = previous_position * (1.0 - t) + atom_pos * t;
+        collision_point -= (collision_point - wall_pos) * 1e-10; // Jitter to avoid numerical issues
+        if (collision_point - wall_pos).dot(&self.direction).abs() <= self.length * 0.5 {
+            Some(collision_point)
+        } else {
+            None
+        }
     }
 }
 
@@ -289,16 +330,67 @@ impl Normal for CylindricalPipe {
             rel.dot(&self.direction),
         );
 
-        // Gives the normal assuming collision from the inside
-        if (local.z.abs() - self.length*0.5).abs() < tolerance {
-            let normal = self.direction * local.z.signum();
-            Some(-normal.normalize()) 
-        } else if ((local.x.powf(2.0) + local.y.powf(2.0)).sqrt() - self.radius) < tolerance {
+        if ((local.x.powf(2.0) + local.y.powf(2.0)).sqrt() - self.radius) < tolerance {
             let normal = self.perp_x * local.x + self.perp_y * local.y;
             Some(-normal.normalize()) 
         }
         else{
             None
+        }
+    }
+}
+
+impl<T : Volume> Wall for T {
+    fn preliminary_collision_check(&self, 
+        atom_position: &Vector3<f64>, 
+        _atom_velocity: &Vector3<f64>, 
+        atom_location: &VolumeStatus,
+        wall_position: &Vector3<f64>, 
+        _dt: f64) -> bool {
+        match atom_location {
+            VolumeStatus::Inside => {
+                return !self.contains(wall_position, atom_position);
+            }
+            VolumeStatus::Outside => {
+                return self.contains(wall_position, atom_position);
+            }
+            VolumeStatus::Open => {
+                return false;
+            }
+        }
+    }
+}
+
+impl Wall for CylindricalPipe {
+    fn preliminary_collision_check(&self, 
+        atom_position: &Vector3<f64>, 
+        atom_velocity: &Vector3<f64>, 
+        _atom_location: &VolumeStatus,
+        wall_position: &Vector3<f64>, 
+        dt: f64) -> bool {
+        let delta_previous = (atom_position - atom_velocity * dt) - wall_position;
+        let projection_previous = delta_previous.dot(&self.direction);
+        let orthogonal_previous = delta_previous - projection_previous * self.direction;
+
+        let delta_current = atom_position - wall_position;
+        let projection_current = delta_current.dot(&self.direction);
+        let orthogonal_current = delta_current - projection_current * self.direction;
+
+        if orthogonal_previous.norm_squared() <= self.radius.powi(2) { 
+            if f64::abs(projection_previous) <= self.length / 2.0 {
+                return orthogonal_current.norm_squared() > self.radius.powi(2);
+            }
+            else {
+                return orthogonal_current.norm_squared() > self.radius.powi(2) && f64::abs(projection_current) <= self.length / 2.0;
+            }
+        }
+        else {
+            if f64::abs(projection_previous) <= self.length / 2.0 {
+                return orthogonal_current.norm_squared() <= self.radius.powi(2);
+            }
+            else {
+                return orthogonal_current.norm_squared() <= self.radius.powi(2) && f64::abs(projection_current) <= self.length / 2.0;
+            }
         }
     }
 }
@@ -354,24 +446,18 @@ fn diffuse(
     (x * perp_x + y * perp_y + z * collision_normal) * velocity.norm()
 }
 
-/// Checks which atoms have collided by checking if they have exited the containing volume.
-fn collision_check<T: Volume + Intersect + Normal>(
-    atom: (Entity, &Position, &Velocity),
-    wall: (Entity, &T, &Wall, &Position),       
+/// Checks which atoms have collided.
+fn collision_check<T: Wall + Intersect + Normal>(
+    atom: (Entity, &Position, &Velocity, &VolumeStatus),
+    wall: (Entity, &T, &WallData, &Position),       
     dt: f64,
     tolerance: f64, 
     max_steps: i32,
 ) -> Option<CollisionInfo> {
-    let (atom_entity, atom_pos, atom_vel) = atom;
+    let (atom_entity, atom_pos, atom_vel, atom_location) = atom;
     let (wall_entity, shape, wall_data, wall_pos) = wall;
 
-    let contained = shape.contains(&wall_pos.pos, &atom_pos.pos);
-    let should_collide = match wall_data.volume_type {
-        VolumeType::Inclusive => !contained,
-        VolumeType::Exclusive => contained,
-    };
-
-    if !should_collide {
+    if !shape.preliminary_collision_check(&atom_pos.pos, &atom_vel.vel, atom_location, &wall_pos.pos, dt) {
         return None;
     }
 
@@ -399,7 +485,7 @@ fn collision_check<T: Volume + Intersect + Normal>(
 /// Do wall collision
 fn do_wall_collision(
     atom: (&mut Position, &mut Velocity, &mut DistanceToTravel, &mut NumberOfWallCollisions),
-    wall: &Wall,
+    wall: &WallData,
     collision: &CollisionInfo,
     distribution: &LambertianProbabilityDistribution,
     dt: f64,
@@ -414,25 +500,36 @@ fn do_wall_collision(
         distance.distance_to_travel = 0.0;
         eprintln!("Distance to travel set to a negative value somehow");
     }
+    // println!("original pos {}", (atom_pos.pos - atom_vel.vel*dt));
 
     // do collision
     match wall.wall_type {
         WallType::Smooth =>
-            {atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel);}
+            {atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel)}
         WallType::Rough =>
-            {atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, &distribution);}
+            {atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, &distribution)}
         WallType::Random{spec_prob} => {
-            if rand::rng().gen_bool(spec_prob) {
-                atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel);
+            if rand::rng().random_bool(spec_prob) {
+                atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel)
             } else {
-                atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, &distribution);
+                atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, &distribution)
             }
         }
-        _ => panic!("Unknown wall type!")
-    };
+        WallType::Exponential{value} => {
+            let angle_of_incidence = (atom_vel.vel.dot(&collision.collision_normal)/atom_vel.vel.norm()).acos();
+            if rand::rng().random_bool((EXP.powf(value * angle_of_incidence) - 1.0)/(EXP.powf(value * PI/2.0) - 1.0) ) {
+                atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel)
+            } else {
+                atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, &distribution)
+            }
+        } 
+    }
+
+    // println!("new vel {}", atom_vel.vel);
 
     if distance.distance_to_travel > 0.0 {
         // propagate along chosen direction
+        // println!("test");
         atom_pos.pos = collision.collision_point + atom_vel.vel.normalize() * distance.distance_to_travel;
     } else {
         atom_pos.pos = collision.collision_point;
@@ -469,9 +566,15 @@ pub fn init_number_of_collisions_system (
 
 /// Do the collisions
 /// To be run after verlet integrate position
-pub fn wall_collision_system<T: Volume + Component + Intersect + Normal>(
-    wall_query: Query<(Entity, &T, &Wall, &Position), Without<Atom>>,
-    mut atom_query: Query<(Entity, &mut Position, &mut Velocity, &mut DistanceToTravel, &mut NumberOfWallCollisions), With<Atom>>,
+pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
+    wall_query: Query<(Entity, &T, &WallData, &Position), Without<Atom>>,
+    mut atom_query: Query<(Entity, 
+        &mut Position, 
+        &mut Velocity, 
+        &mut DistanceToTravel, 
+        &mut NumberOfWallCollisions, 
+        &VolumeStatus), 
+        With<Atom>>,
     batch_strategy: Res<AtomECSBatchStrategy>,
     timestep: Res<Timestep>,
     threshold: Res<SurfaceThreshold>, 
@@ -482,21 +585,19 @@ pub fn wall_collision_system<T: Volume + Component + Intersect + Normal>(
     let max_steps = max_steps.0;
     let dt = timestep.delta;
     let walls: Vec<_> = wall_query.iter().collect();
-
     atom_query
         .par_iter_mut()
         .batching_strategy(batch_strategy.0.clone())
-        .for_each(|(atom_entity, mut pos, mut vel, mut distance, mut collisions)| {
+        .for_each(|(atom_entity, mut pos, mut vel, mut distance, mut collisions, location)| {
 
             let mut dt_atom = dt;
             let mut num_of_collisions = 0;
 
-            while distance.distance_to_travel > 0.0 && num_of_collisions < 1000 { 
+            while distance.distance_to_travel > 0.0 && num_of_collisions < 10000 { 
                 let mut collided = false;
-
                 for (wall_entity, shape, wall, wall_pos) in &walls {
                     if let Some(collision_info) = collision_check(
-                        (atom_entity, &pos, &vel),
+                        (atom_entity, &pos, &vel, &location),
                         (*wall_entity, *shape, *wall, *wall_pos),
                         dt_atom,
                         tolerance,
@@ -538,6 +639,38 @@ pub fn reset_distance_to_travel_system(
         distance.distance_to_travel = vel.vel.norm() * dt;
     }
 }
+
+/// Assign location status to atoms
+pub fn assign_location_status_system(
+    mut query: Query<(Entity, &Position), (With<Atom>, With<NewlyCreated>)>,
+    spheres: Query<(&MySphere, &Position), With<WallData>>,
+    cylinders: Query<(&MyCylinder, &Position), With<WallData>>,
+    cuboids: Query<(&MyCuboid, &Position), With<WallData>>,
+    mut commands: Commands,
+) {
+    for (atom_entity, pos) in query.iter_mut() {
+        let has_walls = spheres.iter().count() > 0 || 
+                        cylinders.iter().count() > 0 || 
+                        cuboids.iter().count() > 0;
+
+        let inside = spheres.iter().any(|(wall, wall_pos)| wall.contains(&wall_pos.pos, &pos.pos)) ||
+                     cylinders.iter().any(|(wall, wall_pos)| wall.contains(&wall_pos.pos, &pos.pos)) ||
+                     cuboids.iter().any(|(wall, wall_pos)| wall.contains(&wall_pos.pos, &pos.pos));
+
+        let status = if has_walls {
+            if inside {
+                VolumeStatus::Inside
+            } else {
+                VolumeStatus::Outside
+            }
+        } else {
+            VolumeStatus::Open
+        };
+
+        commands.entity(atom_entity).insert(status);
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -884,23 +1017,23 @@ mod tests {
         let mut app = App::new();
         let position1 = Position {pos: Vector3::new(5.0, 0.0, 0.0)};
         let velocity1= Velocity {vel: Vector3::new(1.0, 0.0, 0.0)};
-        let dt = 1.0 + 1e-15; // seems a bit too imprecise? maybe
-        let atom1 = app.world_mut().spawn(position1.clone()).insert(velocity1.clone()).insert(Atom).id();
+        let dt = 1.0 + 1e-15;
+        let atom1 = app.world_mut().spawn(position1.clone()).insert(velocity1.clone()).insert(Atom).insert(VolumeStatus::Inside).id();
 
         let wall_pos1 = Position {pos: Vector3::new(0.0, 0.0, 0.0)};
         let sphere = MySphere{radius: 4.0 };
-        let wall_type = Wall {
-            volume_type: VolumeType::Inclusive,
+        let wall_type = WallData {
             wall_type: WallType::Smooth};
         let sphere_wall = app.world_mut()
             .spawn(wall_pos1.clone())
-            .insert(Wall {
-                volume_type: VolumeType::Inclusive,
+            .insert(WallData {
                 wall_type: WallType::Smooth})
             .insert(MySphere{radius: 4.0 })
             .id();
 
-        let result1 = collision_check((atom1, &position1, &velocity1), (sphere_wall, &sphere, &wall_type, &wall_pos1), dt, TOLERANCE, MAX_STEPS);
+        let result1 = collision_check((atom1, &position1, &velocity1, &VolumeStatus::Inside), 
+            (sphere_wall, &sphere, &wall_type, &wall_pos1), 
+            dt, TOLERANCE, MAX_STEPS);
         match result1 {
             Some(collision_info) => {
                 assert_eq!(atom1, collision_info.atom);
@@ -923,23 +1056,24 @@ mod tests {
 
         let position2 = Position {pos: Vector3::new(5.0, 0.0, 0.0)};
         let velocity2 = Velocity {vel: Vector3::new(1.0, 0.0, 0.0)};
-        let dt = 1.0 + 1e-15; // seems a bit too imprecise? maybe
-        let atom2 = app.world_mut().spawn(position2.clone()).insert(velocity2.clone()).insert(Atom).id();
+        let dt = 1.0;
+        let atom2 = app.world_mut().spawn(position2.clone()).insert(velocity2.clone()).insert(Atom).insert(VolumeStatus::Inside).id();
 
         let wall_pos2 = Position {pos: Vector3::new(0.0, 0.0, 0.0)};
         let cuboid = MyCuboid{half_width: Vector3::new(4.0, 1.0, 1.0)};
-        let wall_type = Wall {
-            volume_type: VolumeType::Inclusive,
+        let wall_type = WallData {
             wall_type: WallType::Smooth};
         let cuboid_wall = app.world_mut()
             .spawn(wall_pos2.clone())
-            .insert(Wall {
-                volume_type: VolumeType::Inclusive,
+            .insert(WallData {
+
                 wall_type: WallType::Smooth})
             .insert(MyCuboid{half_width: Vector3::new(4.0, 1.0, 1.0)})
             .id();
 
-        let result2 = collision_check((atom2, &position2, &velocity2), (cuboid_wall, &cuboid, &wall_type, &wall_pos1), dt, TOLERANCE, MAX_STEPS);
+        let result2 = collision_check((atom2, &position2, &velocity2, &VolumeStatus::Inside), 
+            (cuboid_wall, &cuboid, &wall_type, &wall_pos2), 
+            dt, TOLERANCE, MAX_STEPS);
         match result2 {
             Some(collision_info) => {
                 assert_eq!(atom2, collision_info.atom);
@@ -962,22 +1096,22 @@ mod tests {
         let position3 = Position {pos: Vector3::new(5.0, 0.0, 0.0)};
         let velocity3 = Velocity {vel: Vector3::new(1.0, 0.0, 0.0)};
         let dt = 1.0 + 1e-15;
-        let atom3 = app.world_mut().spawn(position3.clone()).insert(velocity3.clone()).insert(Atom).id();
+        let atom3 = app.world_mut().spawn(position3.clone()).insert(velocity3.clone()).insert(Atom).insert(VolumeStatus::Inside).id();
 
         let wall_pos3 = Position {pos: Vector3::new(0.0, 0.0, 0.0)};
         let cylinder = MyCylinder::new(1.0, 8.0, Vector3::new(1.0, 0.0, 0.0));
-        let wall_type = Wall {
-            volume_type: VolumeType::Inclusive,
+        let wall_type = WallData {
             wall_type: WallType::Smooth};
         let cylinder_wall = app.world_mut()
             .spawn(wall_pos3.clone())
-            .insert(Wall {
-                volume_type: VolumeType::Inclusive,
+            .insert(WallData {
                 wall_type: WallType::Smooth})
             .insert(MyCylinder::new(1.0, 8.0, Vector3::new(1.0, 0.0, 0.0)))
             .id();
 
-        let result3 = collision_check((atom3, &position3, &velocity3), (cylinder_wall, &cylinder, &wall_type, &wall_pos1), dt, TOLERANCE, MAX_STEPS);
+        let result3 = collision_check((atom3, &position3, &velocity3, &VolumeStatus::Inside), 
+            (cylinder_wall, &cylinder, &wall_type, &wall_pos3), 
+            dt, TOLERANCE, MAX_STEPS);
         match result3 {
             Some(collision_info) => {
                 assert_eq!(atom3, collision_info.atom);
@@ -985,6 +1119,44 @@ mod tests {
                 assert_approx_eq!(4.0, collision_info.collision_point[0], TOLERANCE);
                 assert_approx_eq!(0.0, collision_info.collision_point[1], TOLERANCE);
                 assert_approx_eq!(0.0, collision_info.collision_point[2], TOLERANCE);
+                assert_approx_eq!(-1.0, collision_info.collision_normal[0], 1e-14);
+                assert_approx_eq!(0.0, collision_info.collision_normal[1], 1e-14);
+                assert_approx_eq!(0.0, collision_info.collision_normal[2], 1e-14);
+            }
+            None => {
+                panic!();
+            }
+        }
+
+        app.world_mut().despawn(atom3);
+        app.world_mut().despawn(cylinder_wall);
+
+        let position4 = Position {pos: Vector3::new(2.5, 1.0, 1.0)};
+        let velocity4 = Velocity {vel: Vector3::new(1.0, 0.0, 0.0)};
+        let dt = 1.0 + 1e-15;
+        let atom4 = app.world_mut().spawn(position4.clone()).insert(velocity4.clone()).insert(Atom).id();
+
+        let wall_pos4 = Position {pos: Vector3::new(1.0, 1.0, 1.0)};
+        let nozzle = CylindricalPipe::new(1.0, 8.0, Vector3::new(0.0, 1.0, 0.0));
+        let wall_type = WallData {
+            wall_type: WallType::Smooth};
+        let pipe_wall = app.world_mut()
+            .spawn(wall_pos4.clone())
+            .insert(WallData {
+                wall_type: WallType::Smooth})
+            .insert(CylindricalPipe::new(1.0, 8.0, Vector3::new(0.0, 1.0, 0.0)))
+            .id();
+
+        let result4 = collision_check((atom4, &position4, &velocity4, &VolumeStatus::Inside), 
+            (pipe_wall, &nozzle, &wall_type, &wall_pos4), 
+            dt, TOLERANCE, MAX_STEPS);
+        match result4 {
+            Some(collision_info) => {
+                assert_eq!(atom4, collision_info.atom);
+                assert_eq!(pipe_wall, collision_info.wall);
+                assert_approx_eq!(2.0, collision_info.collision_point[0], TOLERANCE);
+                assert_approx_eq!(1.0, collision_info.collision_point[1], TOLERANCE);
+                assert_approx_eq!(1.0, collision_info.collision_point[2], TOLERANCE);
                 assert_approx_eq!(-1.0, collision_info.collision_normal[0], 1e-14);
                 assert_approx_eq!(0.0, collision_info.collision_normal[1], 1e-14);
                 assert_approx_eq!(0.0, collision_info.collision_normal[2], 1e-14);
@@ -1010,16 +1182,16 @@ mod tests {
             .insert(velocity.clone())
             .insert(DistanceToTravel{distance_to_travel: length})
             .insert(NumberOfWallCollisions{value: 0})
+            .insert(VolumeStatus::Inside)
             .id();
-        let wall = app.world_mut().spawn(Wall {
-            volume_type: VolumeType::Inclusive,
+        let wall = app.world_mut().spawn(WallData {
             wall_type: WallType::Smooth}).id();
         let collision_point = Vector3::new(0.0,0.0,0.0);
         let collision_normal = Vector3::new(-1.0,0.0,0.0);
 
         fn test_system(
             mut query: Query<(Entity, &mut Position, &mut Velocity, &mut DistanceToTravel, &mut NumberOfWallCollisions)>,
-            wall: Query<(Entity, &Wall)>,
+            wall: Query<(Entity, &WallData)>,
             distribution: Res<LambertianProbabilityDistribution>,
             tolerance: Res<SurfaceThreshold>) {
             query.iter_mut().for_each(|(atom, mut atom_pos, mut atom_vel, mut distance, mut collisions)| {
@@ -1093,15 +1265,13 @@ mod tests {
 
         let mut app = App::new();
         app.world_mut()
-            .spawn(Wall{
-                volume_type: VolumeType::Inclusive,
-                wall_type: WallType::Smooth})
-            .insert(MyCuboid{half_width: Vector3::new(1.0, 1.0, 1.0)})
+            .spawn(WallData{wall_type: WallType::Smooth})
+            .insert(CylindricalPipe::new(1.0, 8.0, Vector3::new(0.0, 0.0, 1.0)))
             .insert(Position{pos: Vector3::new(0.0, 0.0, 0.0)});
         let atom = app.world_mut()
             .spawn(Atom)
-            .insert(Position{pos: Vector3::new(-1.0, 0.0, 0.0)})
-            .insert(Velocity{vel: Vector3::new(6.0, -6.0, 0.0)})
+            .insert(Position{pos: Vector3::new(-1.0 + 1e-8, 0.0, 0.0)})
+            .insert(Velocity{vel: Vector3::new(0.0, -2.5 * PI, 0.0)})
             .insert(NewlyCreated)
             .insert(Force::default())
             .insert(Mass { value: 1.0 })
@@ -1119,10 +1289,17 @@ mod tests {
             .expect("Entity not found")
             .pos;
 
+        let wall_collisions = app.world()
+            .entity(atom)
+            .get::<NumberOfWallCollisions>()
+            .expect("Entity not found")
+            .value;
+
         println!("{}", new_position);
-        assert_approx_eq!(new_position[0], 0.0, 10.0*TOLERANCE);
-        assert_approx_eq!(new_position[1], -1.0, 10.0*TOLERANCE);
-        assert_approx_eq!(new_position[2], 0.0, 10.0*TOLERANCE);
+        println!("wall collisions {}", wall_collisions); 
+        assert_approx_eq!(new_position[0], 0.0, 1e-5);
+        assert_approx_eq!(new_position[1], -1.0, 1e-5);
+        assert_approx_eq!(new_position[2], 0.0, 1e-5);
     }
 }
 

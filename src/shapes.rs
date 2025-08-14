@@ -216,17 +216,6 @@ impl CylindricalPipe {
     }
 }
 
-impl Volume for CylindricalPipe {
-    fn contains(&self, volume_position: &Vector3<f64>, entity_position: &Vector3<f64>) -> bool {
-        let delta = volume_position - entity_position;
-        let projection = delta.dot(&self.direction);
-
-        let orthogonal = delta - projection * self.direction;
-
-        !(orthogonal.norm_squared() > self.radius.powi(2) && f64::abs(projection) < self.length / 2.0)
-    }
-}
-
 impl Surface for CylindricalPipe {
     fn get_random_point_on_surface(
         &self,

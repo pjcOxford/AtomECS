@@ -71,7 +71,10 @@ impl Plugin for CollisionPlugin {
             .run_if(apply_wall_collisions));
         app.add_systems(PreUpdate, init_distance_to_travel_system
             .in_set(CollisionsSet::WallCollisionSystems)
-            .run_if(apply_wall_collisions));        
+            .run_if(apply_wall_collisions));
+        app.add_systems(PreUpdate, assign_location_status_system
+            .in_set(CollisionsSet::WallCollisionSystems)
+            .run_if(apply_wall_collisions));
         app.add_systems(PreUpdate, init_number_of_collisions_system
             .in_set(CollisionsSet::WallCollisionSystems)
             .run_if(apply_wall_collisions));
