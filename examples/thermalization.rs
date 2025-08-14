@@ -1,24 +1,22 @@
-//! Time-Orbiting Potential (TOP) trap with collisions
-
 extern crate atomecs as lib;
 extern crate nalgebra;
+use nalgebra::Vector3;
+use rand_distr::{Distribution, Uniform};
+use bevy::prelude::*;
 use lib::atom::{Atom, Force, Mass, Position, Velocity};
-use lib::collisions::CollisionPlugin;
-use lib::collisions::atom_collisions::{CollisionParameters, CollisionsTracker};
 use lib::initiate::NewlyCreated;
 use lib::integrator::Timestep;
 use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
 use lib::simulation::SimulationBuilder;
-use nalgebra::Vector3;
-use rand_distr::{Distribution, Uniform};
-use bevy::prelude::*;
 use std::fs::File;
 use std::io::{Error, Write};
 use std::time::Instant;
 use lib::shapes::Sphere as MySphere;
-use lib::collisions::wall_collisions::{Wall, VolumeType,};
-use lib::sim_region::SimulationVolume;
+use lib::collisions::wall_collisions::{WallData, WallType};
+use lib::collisions::CollisionPlugin;
+use lib::collisions::atom_collisions::{CollisionParameters, CollisionsTracker};
+use lib::sim_region::{SimulationVolume, VolumeType};
 
 fn main() {
     let now = Instant::now();
@@ -70,7 +68,8 @@ fn main() {
     });
 
     sim.world_mut()
-        .spawn(Wall{volume_type: VolumeType::Inclusive})
+        .spawn(WallData{
+            wall_type: WallType::Rough})
         .insert(MySphere{radius: 5e-2})
         .insert(Position{pos: Vector3::new(0.0, 0.0, 0.0)});
 
@@ -82,12 +81,11 @@ fn main() {
             radius: 502e-4, 
         })
         .insert(SimulationVolume {
-            volume_type: lib::sim_region::VolumeType::Inclusive,
+            volume_type: VolumeType::Inclusive,
         });
 
     // Define timestep
-    sim.world_mut().insert_resource(Timestep { delta: 5e-5 }); //Aliasing of TOP field or other strange effects can occur if timestep is not much smaller than TOP field period.
-                                                //Timestep must also be much smaller than mean collision time.
+    sim.world_mut().insert_resource(Timestep { delta: 5e-5 });
 
     let mut filename = File::create("collisions.txt").expect("Cannot create file.");
 
@@ -110,7 +108,7 @@ fn main() {
     println!("Simulation completed in {} ms.", now.elapsed().as_millis());
 }
 
-// // Write collision stats to file
+// Write collision stats to file
 
 fn write_collisions_tracker(
     filename: &mut File,
