@@ -208,28 +208,14 @@ fn do_collision(mut v1: Vector3<f64>, mut v2: Vector3<f64>) -> (Vector3<f64>, Ve
     (v1, v2)
 }
 
-pub mod tests {
-    #[allow(unused_imports)]
+#[cfg(test)]
+mod tests {
     use super::*;
-    #[allow(unused_imports)]
     use crate::atom::{Atom, Force, Mass, Position, Velocity};
-    #[allow(unused_imports)]
     use crate::initiate::NewlyCreated;
-    #[allow(unused_imports)]
-    use crate::integrator::{
-        Step, Timestep,
-    };
-    #[allow(unused_imports)]
+    use crate::integrator::Timestep;
     use crate::collisions::CollisionPlugin;
-
-    #[allow(unused_imports)]
     use nalgebra::Vector3;
-    #[allow(unused_imports)]
-    use bevy::prelude::*;
-    #[allow(unused_imports)]
-    use crate::simulation::SimulationBuilder;
-    extern crate bevy;
-    #[allow(unused_imports)]
     use crate::simulation::SimulationBuilder;
 
     #[test]
