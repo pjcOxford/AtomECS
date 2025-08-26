@@ -30,11 +30,11 @@ where
 {
     fn default() -> Self {
         ZeemanShiftSampler::<T> {
-            /// Zeemanshift for sigma plus transition in rad/s
+            // Zeemanshift for sigma plus transition in rad/s
             sigma_plus: f64::NAN,
-            /// Zeemanshift for sigma minus transition in rad/s
+            // Zeemanshift for sigma minus transition in rad/s
             sigma_minus: f64::NAN,
-            /// Zeemanshift for pi transition in rad/s
+            // Zeemanshift for pi transition in rad/s
             sigma_pi: f64::NAN,
             phantom: PhantomData,
         }

@@ -13,12 +13,12 @@ pub struct BoxID {
 
 /// Initializes boxid component
 pub fn init_boxid_system(
-    mut query: Query<(Entity), (Without<BoxID>, With<Atom>)>,
+    mut query: Query<Entity, (Without<BoxID>, With<Atom>)>,
     mut commands: Commands,
 ) {
     query
         .iter_mut()
-        .for_each(|(entity)| {
+        .for_each(|entity| {
             commands.entity(entity).insert(BoxID { id: 0 });
         });
 }

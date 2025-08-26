@@ -48,7 +48,7 @@ impl MassDistribution {
             total += mr.ratio;
         }
 
-        for mut mr in &mut self.distribution {
+        for mr in &mut self.distribution {
             mr.ratio /= total;
         }
         self.normalised = true

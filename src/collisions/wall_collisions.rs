@@ -443,13 +443,13 @@ fn diffuse(
 /// Checks which atoms have collided.
 fn collision_check<T: Wall + Intersect + Normal>(
     atom: (Entity, &Position, &Velocity, &VolumeStatus),
-    wall: (Entity, &T, &WallData, &Position),       
+    wall: (Entity, &T, &Position),       
     dt: f64,
     tolerance: f64, 
     max_steps: i32,
 ) -> Option<CollisionInfo> {
     let (atom_entity, atom_pos, atom_vel, atom_location) = atom;
-    let (wall_entity, shape, wall_data, wall_pos) = wall;
+    let (wall_entity, shape, wall_pos) = wall;
 
     if !shape.preliminary_collision_check(&atom_pos.pos, &atom_vel.vel, atom_location, &wall_pos.pos, dt) {
         return None;
@@ -544,11 +544,10 @@ pub fn init_distance_to_travel_system (
 
 /// Initializes number of wall collisions component
 pub fn init_number_of_collisions_system (
-    mut query: Query<(Entity, &Velocity), (With<Atom>, Without<NumberOfWallCollisions>)>,
+    mut query: Query<Entity, (With<Atom>, Without<NumberOfWallCollisions>)>,
     mut commands: Commands,
-    timestep: Res<Timestep>,
 ) {
-    for (atom_entity, vel) in query.iter_mut() {
+    for atom_entity in query.iter_mut() {
         commands.entity(atom_entity).insert(NumberOfWallCollisions {
             value: 0
         });
@@ -589,7 +588,7 @@ pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
                 for (wall_entity, shape, wall, wall_pos) in &walls {
                     if let Some(collision_info) = collision_check(
                         (atom_entity, &pos, &vel, &location),
-                        (*wall_entity, *shape, *wall, *wall_pos),
+                        (*wall_entity, *shape, *wall_pos),
                         dt_atom,
                         tolerance,
                         max_steps,

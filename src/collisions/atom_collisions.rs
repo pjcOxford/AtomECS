@@ -20,8 +20,6 @@ use hashbrown::HashMap;
 use nalgebra::Vector3;
 use rand::Rng;
 use bevy::prelude::*;
-use crate::integrator::IntegrationSet;
-use crate::integrator::AtomECSBatchStrategy;
 use crate::collisions::spatial_grid::BoxID;
 
 /// A patition of space within which collisions can occur
@@ -221,6 +219,7 @@ pub mod tests {
     use crate::integrator::{
         Step, Timestep,
     };
+    #[allow(unused_imports)]
     use crate::collisions::CollisionPlugin;
 
     #[allow(unused_imports)]
@@ -228,6 +227,7 @@ pub mod tests {
     #[allow(unused_imports)]
     use bevy::prelude::*;
     extern crate bevy;
+    #[allow(unused_imports)]
     use crate::simulation::SimulationBuilder;
 
     #[test]
