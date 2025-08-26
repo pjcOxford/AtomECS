@@ -18,3 +18,5 @@
 .idea/
 /images
 /data_analysis
+*.png
+*.gif
