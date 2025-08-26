@@ -60,7 +60,7 @@ fn pos_to_id(pos: Vector3<f64>, n: i64, width: f64) -> i64 {
         yp = (pos[1] / width + 0.5 * (n as f64)).floor() as i64;
         zp = (pos[2] / width + 0.5 * (n as f64)).floor() as i64;
         //convert position to box id
-        id = xp + n * yp + n.pow(2) * zp;
+        id = xp * 9803 + n * yp * 5213 + n.pow(2) * zp * 7789;
     }
 
     id
@@ -91,11 +91,11 @@ pub mod tests {
         let id6 = pos_to_id(pos6, n, width);
         let id7 = pos_to_id(pos7, n, width);
 
-        assert_eq!(id1, 555);
-        assert_eq!(id2, 555);
-        assert_eq!(id3, 556);
-        assert_eq!(id4, 559);
-        assert_eq!(id5, 550);
+        assert_eq!(id1, 4204165);
+        assert_eq!(id2, 4204165);
+        assert_eq!(id3, 4213968);
+        assert_eq!(id4, 4243377);
+        assert_eq!(id5, 4155150);
         assert_eq!(id6, i64::MAX);
         assert_eq!(id7, 0);
     }
