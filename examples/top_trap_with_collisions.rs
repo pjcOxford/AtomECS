@@ -70,8 +70,8 @@ fn main() {
             .insert(Mass { value: 87.0 });
     }
 
-    sim.world_mut().insert_resource(ApplyAtomCollisions{apply_atom_collision: true });
-    sim.world_mut().insert_resource(ApplyWallCollisions{apply_wall_collision: false });
+    sim.world_mut().insert_resource(ApplyAtomCollisions(true));
+    sim.world_mut().insert_resource(ApplyWallCollisions(false));
     sim.world_mut().insert_resource(CollisionParameters {
         macroparticle: 4e2,
         box_number: 200, //Any number large enough to cover entire cloud with collision boxes. Overestimating box number will not affect performance.

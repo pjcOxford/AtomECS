@@ -7,7 +7,6 @@ use std::marker::PhantomData;
 use super::emit::AtomNumberToEmit;
 use super::precalc::{MaxwellBoltzmannSource, PrecalculatedSpeciesInformation};
 use super::species::{AtomCreator};
-use crate::constant;
 use crate::constant::PI;
 use crate::initiate::*;
 
