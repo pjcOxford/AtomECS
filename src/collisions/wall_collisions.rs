@@ -83,10 +83,10 @@ pub trait SDF {
 pub trait Wall {
     /// Collision check for open walls
     fn preliminary_collision_check(&self, 
-        atom_position: &Vector3<f64>, 
-        atom_velocity: &Vector3<f64>, 
+        atom_pos: &Vector3<f64>, 
+        atom_vel: &Vector3<f64>, 
         atom_location: &VolumeStatus,
-        wall_position: &Vector3<f64>, 
+        wall_pos: &Vector3<f64>, 
         dt: f64) -> bool;
 }
 
@@ -187,14 +187,14 @@ impl<T : SDF> Intersect for T {
         let mut distance_traveled = 0.0;
 
         for _ in 0..max_steps {
-            let current_pos = atom_pos + direction * distance_traveled;
-            let local_pos = current_pos - wall_pos;
+            let curr_pos = atom_pos + direction * distance_traveled;
+            let local_pos = curr_pos - wall_pos;
 
             let distance_to_surface = self.signed_distance(&local_pos);
 
             if distance_to_surface < tolerance {
                 if distance_traveled + distance_to_surface < max_distance + tolerance {
-                    return Some(current_pos);
+                    return Some(curr_pos);
                 }
                 else {
                     // eprintln!("Took too long to collide");
@@ -219,18 +219,18 @@ impl Intersect for CylindricalPipe {
         _tolerance: f64,
         _max_steps: i32,
     ) -> Option<Vector3<f64>> {
-        let previous_position = atom_pos - atom_vel * max_time;
-        let delta_previous = previous_position - wall_pos;
-        let delta_current = atom_pos - wall_pos;
+        let prev_pos = atom_pos - atom_vel * max_time;
+        let delta_prev = prev_pos - wall_pos;
+        let delta_curr = atom_pos - wall_pos;
 
-        let projection_previous = delta_previous.dot(&self.direction);
-        let orthogonal_previous = delta_previous - projection_previous * self.direction;
-        let projection_current = delta_current.dot(&self.direction);
-        let orthogonal_current = delta_current - projection_current * self.direction;
+        let axial_prev = delta_prev.dot(&self.direction);
+        let radial_prev = delta_prev - axial_prev * self.direction;
+        let axial_curr = delta_curr.dot(&self.direction);
+        let radial_curr = delta_curr - axial_curr * self.direction;
 
-        let a = (orthogonal_current - orthogonal_previous).norm_squared();
-        let b = 2.0 * orthogonal_previous.dot(&(&orthogonal_current - &orthogonal_previous));
-        let c = orthogonal_previous.norm_squared() - self.radius.powi(2);
+        let a = (radial_curr - radial_prev).norm_squared();
+        let b = 2.0 * radial_prev.dot(&(&radial_curr - &radial_prev));
+        let c = radial_prev.norm_squared() - self.radius.powi(2);
 
         // Solve quadratic equation for t
         let discriminant = b * b - 4.0 * a * c;
@@ -255,7 +255,7 @@ impl Intersect for CylindricalPipe {
         };
 
         // Calculate the collision point
-        let mut collision_point = previous_position * (1.0 - t) + atom_pos * t;
+        let mut collision_point = prev_pos * (1.0 - t) + atom_pos * t;
         collision_point -= (collision_point - wall_pos) * 1e-10; // Jitter to avoid numerical issues
         if (collision_point - wall_pos).dot(&self.direction).abs() <= self.length * 0.5 {
             Some(collision_point)
@@ -342,17 +342,17 @@ impl Normal for CylindricalPipe {
 
 impl<T : Volume> Wall for T {
     fn preliminary_collision_check(&self, 
-        atom_position: &Vector3<f64>, 
-        _atom_velocity: &Vector3<f64>, 
+        atom_pos: &Vector3<f64>, 
+        _atom_vel: &Vector3<f64>, 
         atom_location: &VolumeStatus,
-        wall_position: &Vector3<f64>, 
+        wall_pos: &Vector3<f64>, 
         _dt: f64) -> bool {
         match atom_location {
             VolumeStatus::Inside => {
-                return !self.contains(wall_position, atom_position);
+                return !self.contains(wall_pos, atom_pos);
             }
             VolumeStatus::Outside => {
-                return self.contains(wall_position, atom_position);
+                return self.contains(wall_pos, atom_pos);
             }
             VolumeStatus::Open => {
                 return false;
@@ -363,28 +363,28 @@ impl<T : Volume> Wall for T {
 
 impl Wall for CylindricalPipe {
     fn preliminary_collision_check(&self, 
-        atom_position: &Vector3<f64>, 
-        atom_velocity: &Vector3<f64>, 
+        atom_pos: &Vector3<f64>, 
+        atom_vel: &Vector3<f64>, 
         _atom_location: &VolumeStatus,
-        wall_position: &Vector3<f64>, 
+        wall_pos: &Vector3<f64>, 
         dt: f64) -> bool {
-        let delta_previous = (atom_position - atom_velocity * dt) - wall_position;
-        let projection_previous = delta_previous.dot(&self.direction);
-        let orthogonal_previous = delta_previous - projection_previous * self.direction;
+        let delta_prev = (atom_pos - atom_vel * dt) - wall_pos;
+        let axial_prev = delta_prev.dot(&self.direction);
+        let radial_prev = delta_prev - axial_prev * self.direction;
 
-        let delta_current = atom_position - wall_position;
-        let projection_current = delta_current.dot(&self.direction);
-        let orthogonal_current = delta_current - projection_current * self.direction;
+        let delta_curr = atom_pos - wall_pos;
+        let axial_curr = delta_curr.dot(&self.direction);
+        let radial_curr = delta_curr - axial_curr * self.direction;
 
-        let is_within_radius_previous = orthogonal_previous.norm_squared() <= self.radius.powi(2);
-        // let is_within_length_previous = f64::abs(projection_previous) <= self.length / 2.0;
-        let is_within_radius_current = orthogonal_current.norm_squared() <= self.radius.powi(2);
-        // let is_within_length_current = f64::abs(projection_current) <= self.length / 2.0;
+        let is_within_radius_prev = radial_prev.norm_squared() <= self.radius.powi(2);
+        // let is_within_length_prev = f64::abs(axial_prev) <= self.length / 2.0;
+        let is_within_radius_curr = radial_curr.norm_squared() <= self.radius.powi(2);
+        // let is_within_length_curr = f64::abs(axial_curr) <= self.length / 2.0;
 
-        if is_within_radius_previous {
-            return !is_within_radius_current;
+        if is_within_radius_prev {
+            return !is_within_radius_curr;
         } else {
-            return is_within_radius_current;
+            return is_within_radius_curr;
         }
     }
 }
@@ -408,7 +408,7 @@ pub fn create_cosine_distribution(mut commands: Commands) {
     let n = 1000; // resolution over which to discretize `theta`.
     for i in 0..n {
         let theta = (i as f64) / (n as f64 + 1.0) * PI / 2.0;
-        let weight = theta.cos()*theta.sin();
+        let weight = theta.cos() * theta.sin();
         thetas.push(theta);
         weights.push(weight);
         // Note: we can exclude d_theta because it is constant and the distribution will be normalized.
@@ -487,7 +487,7 @@ fn do_wall_collision(
 ) -> f64 {
     let (atom_pos, atom_vel, distance, num_of_collisions) = atom;
     num_of_collisions.value += 1;
-    // subtract distance traveled to the collision point from previous position
+    // subtract distance traveled to the collision point from prev position
     let traveled = ((atom_pos.pos - atom_vel.vel*dt) - collision.collision_point).norm();
     distance.distance_to_travel -= traveled;
     if - distance.distance_to_travel > tolerance {
@@ -519,11 +519,8 @@ fn do_wall_collision(
         } 
     }
 
-    // println!("new vel {}", atom_vel.vel);
-
     if distance.distance_to_travel > 0.0 {
         // propagate along chosen direction
-        // println!("test");
         atom_pos.pos = collision.collision_point + atom_vel.vel.normalize() * distance.distance_to_travel;
     } else {
         atom_pos.pos = collision.collision_point;
