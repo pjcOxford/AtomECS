@@ -1,19 +1,19 @@
 pub mod atom_collisions;
 pub mod wall_collisions;
 pub mod spatial_grid;
+pub mod wall_collision_info;
 
 use bevy::prelude::*;
-use crate::collisions::atom_collisions::*;
+use std::fmt;
+use crate::collisions::{atom_collisions::*, wall_collisions::*, spatial_grid::*};
+use crate::atom::Atom;
 use crate::integrator::IntegrationSet;
-use crate::collisions::wall_collisions::*;
-use crate::collisions::spatial_grid::*;
 use crate::shapes::{
     Cylinder as MyCylinder,
     Cuboid as MyCuboid,
     Sphere as MySphere,
     CylindricalPipe,
 };
-
 use rand;
 use rand::distr::Distribution;
 use rand::distr::weighted::WeightedIndex;
@@ -40,6 +40,29 @@ fn apply_atom_collisions(apply_atom_collision: Res<ApplyAtomCollisions>) -> bool
 
 fn apply_wall_collisions(apply_wall_collision: Res<ApplyWallCollisions>) -> bool {
     apply_wall_collision.0
+}
+
+#[derive(Component, Clone)]
+pub struct NumberOfWallCollisions {
+    pub value: i32
+}
+
+impl fmt::Display for NumberOfWallCollisions {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.value)
+    }
+}
+
+/// Initializes number of wall collisions component
+pub fn init_number_of_collisions_system (
+    mut query: Query<Entity, (With<Atom>, Without<NumberOfWallCollisions>)>,
+    mut commands: Commands,
+) {
+    for atom_entity in query.iter_mut() {
+        commands.entity(atom_entity).insert(NumberOfWallCollisions {
+            value: 0
+        });
+    }
 }
 
 pub struct CollisionPlugin;
