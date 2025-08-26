@@ -376,21 +376,15 @@ impl Wall for CylindricalPipe {
         let projection_current = delta_current.dot(&self.direction);
         let orthogonal_current = delta_current - projection_current * self.direction;
 
-        if orthogonal_previous.norm_squared() <= self.radius.powi(2) { 
-            if f64::abs(projection_previous) <= self.length / 2.0 {
-                return orthogonal_current.norm_squared() > self.radius.powi(2);
-            }
-            else {
-                return orthogonal_current.norm_squared() > self.radius.powi(2) && f64::abs(projection_current) <= self.length / 2.0;
-            }
-        }
-        else {
-            if f64::abs(projection_previous) <= self.length / 2.0 {
-                return orthogonal_current.norm_squared() <= self.radius.powi(2);
-            }
-            else {
-                return orthogonal_current.norm_squared() <= self.radius.powi(2) && f64::abs(projection_current) <= self.length / 2.0;
-            }
+        let is_within_radius_previous = orthogonal_previous.norm_squared() <= self.radius.powi(2);
+        // let is_within_length_previous = f64::abs(projection_previous) <= self.length / 2.0;
+        let is_within_radius_current = orthogonal_current.norm_squared() <= self.radius.powi(2);
+        // let is_within_length_current = f64::abs(projection_current) <= self.length / 2.0;
+
+        if is_within_radius_previous {
+            return !is_within_radius_current;
+        } else {
+            return is_within_radius_current;
         }
     }
 }
@@ -1254,7 +1248,6 @@ mod tests {
 
     // Test multiple collisions
     // Basically an integration test
-    // Will also fail as is because OldForces Force element is private
     #[test]
     fn test_systems() {
         use crate::integrator::{IntegrationPlugin, IntegrationSet, Timestep, AtomECSBatchStrategy, OldForce};
