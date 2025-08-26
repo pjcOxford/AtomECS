@@ -37,11 +37,7 @@ where
 {
     fn default() -> Self {
         TwoLevelPopulation {
-            // steady-state population density of the ground state, a LASER_COUNT
-            //  in [0,1]
             ground: f64::NAN,
-            // steady-state population density of the excited state, a LASER_COUNT
-            //  in [0,1]
             excited: f64::NAN,
             marker: PhantomData,
         }
