@@ -138,8 +138,9 @@ fn collision_check<T: Wall + Intersect + Normal>(
     }
 
     // Do collision check
-    if let Some(collision_point) = shape.calculate_intersect(&atom_pos.pos, &atom_vel.vel, &wall_pos.pos, dt, tolerance, max_steps) {
+    if let Some(mut collision_point) = shape.calculate_intersect(&atom_pos.pos, &atom_vel.vel, &wall_pos.pos, dt, tolerance, max_steps) {
         if let Some(collision_normal) = shape.calculate_normal(&collision_point, &wall_pos.pos, tolerance) {
+            collision_point += 1e-10 * collision_normal; // Offset collision point along normal to avoid numerical issues
             return Some(CollisionInfo {
                 atom: atom_entity,
                 wall: wall_entity,
@@ -159,7 +160,7 @@ fn collision_check<T: Wall + Intersect + Normal>(
 }
 
 /// Specular reflection
-pub fn specular(
+fn specular(
     collision_normal: &Vector3<f64>,
     velocity: &Vector3<f64>,
 ) -> Vector3<f64> {
@@ -168,7 +169,7 @@ pub fn specular(
 }
 
 /// Diffuse collision (Lambertian)
-pub fn diffuse( 
+fn diffuse( 
     collision_normal: &Vector3<f64>, 
     velocity: &Vector3<f64>,
     distribution: &LambertianProbabilityDistribution) -> Vector3<f64> {

@@ -178,8 +178,7 @@ impl Intersect for CylindricalPipe {
         };
 
         // Calculate the collision point
-        let mut collision_point = prev_pos * (1.0 - t) + atom_pos * t;
-        collision_point -= (collision_point - wall_pos) * 1e-10; // Jitter to avoid numerical issues
+        let collision_point = prev_pos * (1.0 - t) + atom_pos * t;
         if (collision_point - wall_pos).dot(&self.direction).abs() <= self.length * 0.5 {
             Some(collision_point)
         } else {
