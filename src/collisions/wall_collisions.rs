@@ -109,15 +109,16 @@ impl Wall for CylindricalPipe {
         let axial_curr = delta_curr.dot(&self.direction);
         let radial_curr = delta_curr - axial_curr * self.direction;
 
-        let is_within_radius_prev = radial_prev.norm_squared() <= self.radius.powi(2);
-        // let is_within_length_prev = f64::abs(axial_prev) <= self.length / 2.0;
-        let is_within_radius_curr = radial_curr.norm_squared() <= self.radius.powi(2);
+        let is_within_radius_prev = radial_prev.norm() <= self.radius;
+        let is_within_length_prev = f64::abs(axial_prev) <= self.length / 2.0;
+        let is_within_radius_curr = radial_curr.norm() <= self.radius;
         // let is_within_length_curr = f64::abs(axial_curr) <= self.length / 2.0;
 
-        if is_within_radius_prev {
-            return !is_within_radius_curr;
+        if is_within_radius_prev ^ is_within_radius_curr {
+            if !is_within_length_prev {return false;}
+            else {return true;}
         } else {
-            return is_within_radius_curr;
+            return false;
         }
     }
 }
@@ -491,7 +492,7 @@ mod tests {
         let dt = 1.0 - 1e-10;
         let position = Position {pos: Vector3::new(1.0, 1.0, 0.0)};
         let velocity = Velocity {vel: Vector3::new(2.0,2.0,0.0)};
-        let length = velocity.vel.norm()*dt;
+        let length = velocity.vel.norm() * dt;
         let distance = DistanceToTravel{distance_to_travel: length};
         let atom = app.world_mut()
             .spawn(Atom)
@@ -501,10 +502,8 @@ mod tests {
             .insert(NumberOfWallCollisions{value: 0})
             .insert(VolumeStatus::Inside)
             .id();
-        let wall = app.world_mut().spawn(WallData {
-            wall_type: WallType::Smooth}).id();
+        app.world_mut().spawn(WallData {wall_type: WallType::Smooth});
         let collision_point = Vector3::new(0.0,0.0,0.0);
-        let collision_normal = Vector3::new(-1.0,0.0,0.0);
 
         fn test_system(
             mut query: Query<(Entity, &mut Position, &mut Velocity, &mut DistanceToTravel, &mut NumberOfWallCollisions)>,
