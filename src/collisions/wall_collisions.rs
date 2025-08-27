@@ -19,13 +19,11 @@ use crate::initiate::NewlyCreated;
 use crate::collisions::wall_collision_info::*;
 use super::LambertianProbabilityDistribution;
 
-// let counter: i32 = 0; // Counter for debugging
-
 #[derive(Resource)]
 pub struct MaxSteps(pub i32); // Max steps for sdf convergence
 
 #[derive(Resource)]
-pub struct SurfaceThreshold(pub f64); // Minimum penetration for detecting a collision
+pub struct SurfaceThreshold(pub f64); // Tolerance for convergence
 
 /// Struct to signify shape is a wall
 #[derive(Component)]
@@ -329,29 +327,25 @@ pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
         });
 }
 
-/// Initializes distance to travel component
-pub fn init_distance_to_travel_system (
-    mut query: Query<(Entity, &Velocity), (With<Atom>, Without<DistanceToTravel>)>,
+/// Updates distance to travel component for atoms
+/// If an atom doesn't have DistanceToTravel, it will be initialized
+/// Otherwise, it will be reset for the next frame
+pub fn update_distance_to_travel_system(
+    mut query_new: Query<(Entity, &Velocity), (With<Atom>, Without<DistanceToTravel>)>,
+    mut query_existing: Query<(&Velocity, &mut DistanceToTravel), With<Atom>>,
     mut commands: Commands,
     timestep: Res<Timestep>,
 ) {
-    for (atom_entity, vel) in query.iter_mut() {
+    // Initialize for new atoms
+    for (atom_entity, vel) in query_new.iter_mut() {
         commands.entity(atom_entity).insert(DistanceToTravel {
             distance_to_travel: vel.vel.norm() * timestep.delta
         });
     }
-}
 
-/// Calculate distance to travel at the end of every frame
-/// To be run before wall collision system
-pub fn reset_distance_to_travel_system(
-    mut query: Query<(&Velocity, &mut DistanceToTravel), With<Atom>>,
-    timestep: Res<Timestep>,
-) {
-    let dt = timestep.delta;
-
-    for (vel, mut distance) in query.iter_mut() {
-        distance.distance_to_travel = vel.vel.norm() * dt;
+    // Reset for existing atoms
+    for (vel, mut distance) in query_existing.iter_mut() {
+        distance.distance_to_travel = vel.vel.norm() * timestep.delta;
     }
 }
 
