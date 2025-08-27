@@ -74,10 +74,9 @@ impl MassDistribution {
     }
 }
 
-pub mod tests {
-    #[allow(unused_imports)]
+#[cfg(test)]
+mod tests {
     use super::*;
-    #[allow(unused_imports)]
     use assert_approx_eq::assert_approx_eq;
 
     #[test]

@@ -66,8 +66,8 @@ fn pos_to_id(pos: Vector3<f64>, n: i64, width: f64) -> i64 {
     id
 }
 
-pub mod tests {
-    #[allow(unused_imports)]
+#[cfg(test)]
+mod tests {
     use super::*;
 
     #[test]

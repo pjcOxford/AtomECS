@@ -40,8 +40,8 @@ impl Plugin for InitiatePlugin {
     }
 }
 
-pub mod tests {
-    #[allow(unused_imports)]
+#[cfg(test)]
+mod tests {
     use super::*;
 
     /// Test the [NewlyCreated] component is properly removed from atoms after an update.

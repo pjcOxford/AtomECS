@@ -269,12 +269,7 @@ impl Normal for CylindricalPipe {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::shapes::{
-        Cylinder as Cylinder,
-        Cuboid as Cuboid,
-        Sphere as Sphere,
-        Volume
-    };
+    use crate::shapes::{Cylinder, Cuboid, Sphere, Volume};
     use crate::constant::PI;
     use rand::Rng;
     use assert_approx_eq::assert_approx_eq;
@@ -420,8 +415,7 @@ mod tests {
             let length = rng.random_range(1.0..10.0);
 
             // Random direction vector
-            let random_dir;
-            random_dir = rand_vec(-1.0, 1.0);
+            let random_dir = rand_vec(-1.0, 1.0);
 
             let wall_pos = rand_vec(-5.0, 5.0);
             let cylinder = Cylinder::new(radius, length, random_dir);
@@ -431,7 +425,7 @@ mod tests {
                 let angle_in = rng.random_range(0.0..std::f64::consts::TAU);
                 let x_in = radial_in * angle_in.cos();
                 let y_in = radial_in * angle_in.sin();
-                let z_in = rng.random_range(-length * 0.4..length * 0.4);
+                let z_in = rng.random_range(-length * 0.5..length * 0.5);
                 let inside = cylinder.perp_x * x_in + cylinder.perp_y * y_in + cylinder.direction * z_in;
                 inside
             };
