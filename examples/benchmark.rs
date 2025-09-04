@@ -34,7 +34,7 @@ pub struct BenchmarkConfiguration {
 impl Default for BenchmarkConfiguration {
     fn default() -> Self {
         BenchmarkConfiguration {
-            n_atoms: 1_000_000,
+            n_atoms: 10_000,
             n_threads: 12,
             n_steps: 5000,
         }

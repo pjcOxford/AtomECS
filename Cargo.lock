@@ -206,7 +206,6 @@ dependencies = [
 name = "atomecs"
 version = "0.8.1"
 dependencies = [
- "approx",
  "assert_approx_eq",
  "atomecs-derive",
  "bevy",
@@ -215,7 +214,6 @@ dependencies = [
  "criterion",
  "csv",
  "hashbrown",
- "multimap",
  "nalgebra",
  "rand 0.9.2",
  "rand_distr 0.5.1",
@@ -2067,15 +2065,6 @@ name = "minimal-lexical"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "68354c5c6bd36d73ff3feceb05efa59b6acb7626617f4962be322a825e61f79a"
-
-[[package]]
-name = "multimap"
-version = "0.10.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d87ecb2933e8aeadb3e3a02b828fed80a7528047e68b4f424523a0981a3a084"
-dependencies = [
- "serde",
-]
 
 [[package]]
 name = "naga"

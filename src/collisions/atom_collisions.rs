@@ -8,24 +8,24 @@
 //! We assume the atoms within a cell have an approximately thermal distribution in order to relate average velocity to average relative velocity.
 //! For cases where this approximation is poor, the collision rate may be wrong.
 //! We assume a single species of atom, with a constant (not velocity dependent) collisional cross-section.
-//!
+//! We cannot have too few particles per box: the current implementation allows the same number of particles to collide multiple times, 
+//! the effect of which is exacerbated in cells with few particles.
 //!
 //!
 
-extern crate multimap;
-use crate::atom::{Position, Velocity, Atom};
-use crate::constant::{PI, SQRT2};
-use crate::integrator::Timestep;
 use hashbrown::HashMap;
 use nalgebra::Vector3;
 use rand::Rng;
 use bevy::prelude::*;
+use crate::atom::{Position, Velocity, Atom};
+use crate::constant::{PI, SQRT2};
+use crate::integrator::Timestep;
 use crate::collisions::spatial_grid::BoxID;
 
 /// A patition of space within which collisions can occur
-pub struct CollisionBox<> {
+pub struct CollisionBox {
     pub entity_velocities: Vec<(Entity, Vector3<f64>)>,
-    pub expected_collision_number: f64,
+    pub expected_collision_checks: f64,
     pub collision_number: i32,
     pub density: f64,
     pub volume: f64,
@@ -37,7 +37,7 @@ impl Default for CollisionBox {
     fn default() -> Self {
         CollisionBox {
             entity_velocities: Vec::new(),
-            expected_collision_number: 0.0,
+            expected_collision_checks: 0.0,
             density: 0.0,
             volume: 0.0,
             atom_number: 0.0,
@@ -59,51 +59,52 @@ impl CollisionBox {
             return;
         }
 
-        ///// n*sigma*v total collisions
-        // vbar is the average _speed_, not the average _velocity_.
-        let mut vsum = 0.0;
-        for (_, velocity) in &self.entity_velocities {
-            vsum += velocity.norm();
-        }
-        let vbar = vsum / self.entity_velocities.len() as f64;
+        // find the max speed in the box to use the No Time Counter method 
+        let max_speed = self.entity_velocities
+        .iter()
+        .map(|(_, velocity)| velocity.norm())
+        .fold(0.0, f64::max);
+    
 
-        // number of collisions is N*n*sigma*v*dt, where n is atom density and N is atom number
-        // probability of one particle colliding is n*sigma*vrel*dt where n is the atom density, sigma cross section and vrel the average relative velocity
-        // vrel = SQRT(2)*vbar, and since we assume these are identical particles we must divide by two since otherwise we count each collision twice
-        // so total number of collisions is N_particles * probability = N_p*n*sigma*vbar*dt/SQRT(2)
+        // number of times we check for collisions is N*n*sigma*v*dt, where n is atom density and N is atom number
+        // probability of any given pair of particles colliding is sigma*vrel/(sigma*vrel)_max, sigma cross section and vrel the relative speed
+        // and since we assume these are identical particles we must divide by two since otherwise we count each collision twice
         let density = self.atom_number / params.box_width.powi(3);
-        self.expected_collision_number =
-            self.particle_number as f64 * density * params.sigma * vbar * dt * (1.0 / SQRT2);
+        self.expected_collision_checks =
+            (self.particle_number as f64 - 1.0) * density * params.sigma * max_speed * dt;
 
-        let mut num_collisions_left: f64 = self.expected_collision_number;
+        let mut num_checks_left: f64 = self.expected_collision_checks;
 
-        if num_collisions_left > params.collision_limit {
-            panic!("Number of collisions in a box in a single frame exceeds limit. Number of collisions={}, limit={}, particles={}.", num_collisions_left, params.collision_limit, self.particle_number);
+        if num_checks_left > params.collision_limit {
+            panic!("Number of collisions in a box in a single frame exceeds limit. Number of collisions={}, limit={}, particles={}.", num_checks_left, params.collision_limit, self.particle_number);
         }
 
-        while num_collisions_left > 0.0 {
-            let collide = if num_collisions_left > 1.0 {
+        while num_checks_left > 0.0 {
+            let check = if num_checks_left > 1.0 {
                 true
             } else {
-                rng.random::<f64>() < num_collisions_left
+                rng.random::<f64>() < num_checks_left
             };
 
-            if collide {
+            if check {
                 let idx1 = rng.random_range(0..self.entity_velocities.len());
-                let mut idx2 = idx1;
-                while idx2 == idx1 {
-                    idx2 = rng.random_range(0..self.entity_velocities.len())
+                let mut idx2 = rng.random_range(0..self.entity_velocities.len() - 1);
+                if idx2 >= idx1 {
+                    idx2 = idx2 + 1;
                 }
 
                 let v1 = self.entity_velocities[idx1].1;
                 let v2 = self.entity_velocities[idx2].1;
-                let (v1new, v2new) = do_collision(v1, v2);
-                self.entity_velocities[idx1].1 = v1new;
-                self.entity_velocities[idx2].1 = v2new;
-                self.collision_number += 1;
+                let collide = rng.random::<f64>() < (v1 - v2).norm() / 2.0 * max_speed;
+                if collide {    
+                    let (v1new, v2new) = do_collision(v1, v2);
+                    self.entity_velocities[idx1].1 = v1new;
+                    self.entity_velocities[idx2].1 = v2new;
+                    self.collision_number += 1;
+                }
             }
 
-            num_collisions_left -= 1.0;
+            num_checks_left -= 1.0;
         }
         /////
     }
@@ -274,7 +275,7 @@ mod tests {
         assert_eq!(collision_box.atom_number, atom_number);
         let density = atom_number / params.box_width.powi(3);
         let expected_number =
-            (1.0 / SQRT2) * MACRO_ATOM_NUMBER as f64 * density * params.sigma * vel.norm() * dt;
+            (1.0 / SQRT2) * (MACRO_ATOM_NUMBER as f64 - 1.0) * density * params.sigma * vel.norm() * dt;
         assert_approx_eq!(
             collision_box.expected_collision_number,
             expected_number,
