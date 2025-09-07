@@ -60,10 +60,10 @@ impl CollisionBox {
         }
 
         // find the max speed in the box to use the No Time Counter method 
-        let max_speed = self.entity_velocities
-        .iter()
-        .map(|(_, velocity)| velocity.norm())
-        .fold(0.0, f64::max);
+        let mut max_speed = self.entity_velocities
+            .iter()
+            .map(|(_, velocity)| velocity.norm())
+            .fold(0.0, f64::max);
     
 
         // number of times we check for collisions is N*n*sigma*v*dt, where n is atom density and N is atom number
@@ -83,7 +83,7 @@ impl CollisionBox {
             let check = if num_checks_left > 1.0 {
                 true
             } else {
-                rng.random::<f64>() < num_checks_left
+                rng.random_bool(num_checks_left)
             };
 
             if check {
@@ -95,8 +95,16 @@ impl CollisionBox {
 
                 let v1 = self.entity_velocities[idx1].1;
                 let v2 = self.entity_velocities[idx2].1;
-                let collide = rng.random::<f64>() < (v1 - v2).norm() / 2.0 * max_speed;
-                if collide {    
+                let vel_rel = (v1 - v2).norm();
+                if vel_rel > 2.0 * max_speed {
+                    println!("!");
+                    num_checks_left += (self.particle_number as f64 - 1.0) * density * params.sigma * (vel_rel - 2.0 * max_speed) * dt / 2.0 ;
+                    max_speed = vel_rel / 2.0;
+                }
+                let prob_collision =  vel_rel / (2.0 * max_speed);
+                // println!("{}", (v1 -v2).norm());
+                let collide = rng.random_bool(prob_collision);
+                if collide {
                     let (v1new, v2new) = do_collision(v1, v2);
                     self.entity_velocities[idx1].1 = v1new;
                     self.entity_velocities[idx2].1 = v2new;
@@ -242,47 +250,59 @@ mod tests {
     }
 
     /// Test that the expected number of collisions in a CollisionBox is correct.
+    /// This will fail sometimes
     #[test]
-    fn collision_rate() {
+    fn test_collision_rate() {
         use assert_approx_eq::assert_approx_eq;
-        let vel = Vector3::new(1.0, 0.0, 0.0);
-        const MACRO_ATOM_NUMBER: usize = 100;
-        
-        // Create dummy entities for testing
-        let mut entity_velocities: Vec<(Entity, Vector3<f64>)> = Vec::new();
-        for _i in 0..MACRO_ATOM_NUMBER {
-            let entity = Entity::PLACEHOLDER; // Or just use the same placeholder for all
-            entity_velocities.push((entity, vel));
-        }
-        
-        let mut collision_box = CollisionBox {
-            entity_velocities,
-            ..Default::default()
-        };
-        
+        let mut rng = rand::rng();
         let params = CollisionParameters {
-            macroparticle: 10.0,
+            macroparticle: 2.0,
             box_number: 1,
-            box_width: 1e-3,
-            sigma: 1e-8,
-            collision_limit: 10_000.0,
+            box_width: 1e-2,
+            sigma: 5e-10,
+            collision_limit: 1_000_000.0,
         };
+        const MACRO_ATOM_NUMBER: usize = 100_000;
         let dt = 1e-3;
-        collision_box.do_collisions(params, dt);
-        
-        assert_eq!(collision_box.particle_number, MACRO_ATOM_NUMBER as i32);
-        let atom_number = params.macroparticle * MACRO_ATOM_NUMBER as f64;
-        assert_eq!(collision_box.atom_number, atom_number);
-        let density = atom_number / params.box_width.powi(3);
-        let expected_number =
-            (1.0 / SQRT2) * (MACRO_ATOM_NUMBER as f64 - 1.0) * density * params.sigma * vel.norm() * dt;
-        assert_approx_eq!(
-            collision_box.expected_collision_number,
-            expected_number,
-            0.01
-        );
-    }
+        let mut expected_collision = 0.0;
+        let mut actual_collision = 0.0;
+        for _i in 0..100 {
+            let x1 = rng.random::<f64>();
+            let x2 = rng.random::<f64>();
+            let v1 = Vector3::new(x1 * 2.0, 0.0, 0.0);
+            let v2 = Vector3::new(x2 * 2.0, 0.0, 0.0);
+            
+            // Create dummy entities for testing
+            let mut entity_velocities: Vec<(Entity, Vector3<f64>)> = Vec::new();
+            for _i in 0..MACRO_ATOM_NUMBER {
+                let entity = Entity::PLACEHOLDER;
+                entity_velocities.push((entity, v1));
+                let entity = Entity::PLACEHOLDER;
+                entity_velocities.push((entity, v2));
+            }
+            
+            let mut collision_box = CollisionBox {
+                entity_velocities,
+                ..Default::default()
+            };
+            
+            collision_box.do_collisions(params, dt);
 
+            let atom_number = params.macroparticle * 2.0 * MACRO_ATOM_NUMBER as f64;
+            let density = atom_number / params.box_width.powi(3);
+            let expected_number = (collision_box.particle_number as f64 - 1.0) * density * params.sigma * (v1 - v2).norm() * dt / 4.0;
+            expected_collision += expected_number;
+            actual_collision += collision_box.collision_number as f64;
+            assert_eq!(collision_box.particle_number, 2 * MACRO_ATOM_NUMBER as i32);
+            assert_eq!(collision_box.atom_number, atom_number);
+            assert_approx_eq!(collision_box.collision_number as f64, expected_number, expected_number * 0.15);
+        }
+        let delta = (expected_collision - actual_collision).abs()/expected_collision;
+        if delta > 0.05 {
+            panic!()
+        }
+        println!("{}", delta);
+    }
 
     /// Test that the system runs and causes nearby atoms to collide. More of an integration test than a unit test.
     #[test]
