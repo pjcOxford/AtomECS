@@ -1,7 +1,7 @@
 //! Implements systems to integrate trajectories.
 
 use crate::atom::*;
-use crate::constant;
+use crate::constant::AMU;
 use crate::initiate::NewlyCreated;
 use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
@@ -56,8 +56,7 @@ fn velocity_verlet_integrate_position(
         .par_iter_mut()
         .batching_strategy(batch_strategy.0.clone())
         .for_each(|(mut pos, mut old_force, vel, force, mass)| {
-            pos.pos =
-                pos.pos + vel.vel * dt + force.force / (constant::AMU * mass.value) / 2.0 * dt * dt;
+            pos.pos += vel.vel * dt + force.force / (AMU * mass.value) / 2.0 * dt * dt;
             old_force.0 = *force;
         });
 }
@@ -75,7 +74,7 @@ fn velocity_verlet_integrate_velocity(
         .par_iter_mut()
         .batching_strategy(batch_strategy.0.clone())
         .for_each(|(mut vel, force, old_force, mass)| {
-            vel.vel += (force.force + old_force.0.force) / (constant::AMU * mass.value) / 2.0 * dt;
+            vel.vel += (force.force + old_force.0.force) / (AMU * mass.value) / 2.0 * dt;
         });
 }
 
@@ -184,7 +183,7 @@ mod tests {
             .insert(Force { force })
             .insert(OldForce(Force { force }))
             .insert(Mass {
-                value: mass / constant::AMU,
+                value: mass / AMU,
             })
             .id();
 
