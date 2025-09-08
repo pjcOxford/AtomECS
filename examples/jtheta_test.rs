@@ -33,8 +33,10 @@ fn main() {
 
     sim.world_mut().insert_resource(ApplyAtomCollisions(false));
     sim.world_mut().insert_resource(ApplyWallCollisions(true));
+
     let radius = 25e-6;
     let length = 1000e-6;
+
     sim.world_mut()
         .spawn(WallData{
             wall_type: WallType::Rough})
@@ -43,7 +45,7 @@ fn main() {
 
     sim.world_mut()
         .spawn(SimulationVolume{volume_type: VolumeType::Inclusive})
-        .insert(MyCylinder::new(100e-6, 2000e-6, Vector3::new(1.0, 0.0, 0.0)))
+        .insert(MyCylinder::new(1500e-6, 2000e-6, Vector3::new(1.0, 0.0, 0.0)))
         .insert(Position{pos: Vector3::new(000e-6, 0.0, 0.0)});
 
     let number_to_emit = 1e10;
@@ -64,7 +66,7 @@ fn main() {
     sim.world_mut()
         .spawn(Oven::<Strontium88> {
             temperature: 700.0,
-            aperture: OvenAperture::Circular{radius: radius, thickness: 1e-9},
+            aperture: OvenAperture::Circular{radius, thickness: 1e-9},
             direction: Vector3::new(1.0, 0.0, 0.0),
             theta_distribution: uniform_distribution,
             max_theta: PI/2.0,
@@ -85,7 +87,7 @@ fn main() {
     sim.world_mut().insert_resource(VelocityCap {value: f64::MAX});
 
     // Run the simulation for a number of steps.
-    for _i in 0..5_000 {
+    for _i in 0..3_000 {
         sim.update();
     }
     println!("Simulation completed in {} ms.", now.elapsed().as_millis());
