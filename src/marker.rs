@@ -16,7 +16,7 @@ pub fn add_marker_system(
         // else if pos.pos.x > 210e-6 {
         //     commands.entity(entity).remove::<Marker>();
         // }
-        if pos.pos.x > 0.0 {
+        if pos.pos.x > 0.5 {
             commands.entity(entity).insert(Marker);
         }
     }
