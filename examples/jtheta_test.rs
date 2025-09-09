@@ -25,8 +25,8 @@ fn main() {
     let now = Instant::now();
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(AtomSourcePlugin::<Strontium88>::default());
-    sim_builder.add_plugins(FileOutputPlugin::<Position, Text, Marker>::new("pos.txt".to_string(),10));
-    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text, Marker>::new("vel.txt".to_string(),10));
+    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(),10));
+    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(),10));
     // sim_builder.add_plugins(FileOutputPlugin::<NumberOfWallCollisions, Text, Atom>::new("wall_collisions.txt".to_string(),1));
     sim_builder.add_plugins(CollisionPlugin);
 
@@ -74,7 +74,7 @@ fn main() {
             phantom: PhantomData,
         })
         .insert(Position {
-            pos: Vector3::new(-99999e-8, 0.0, 0.0),
+            pos: Vector3::new(- length * 0.99999, 0.0, 0.0),
         })
         .insert(MassDistribution::new(vec![MassRatio {
             mass: 88.0,

@@ -5,6 +5,7 @@
 
 use crate::atom::Atom;
 use crate::integrator::Step;
+use crate::marker::{Marker, WriteOrNot};
 use bevy::prelude::*;
 use nalgebra::Vector3;
 use std::fmt::Display;
@@ -24,70 +25,63 @@ use byteorder::{LittleEndian, WriteBytesExt};
 /// The data type `C` must be a [Component](specs::Component) and implement the
 /// [Clone](struct.Clone.html) trait.
 #[derive(Resource)]
-pub struct FileOutputResource<C: Component + Clone, F: Format<C, BufWriter<File>>, A = Atom> {
+pub struct FileOutputResource<C: Component + Clone, F: Format<C, BufWriter<File>>> {
     /// Number of integration steps between each file output.
     pub interval: u64,
     /// The file name of the output file.
     pub file_name: String,
     /// Stream where output is written.
     stream: Option<BufWriter<File>>,
-    atom_flag: PhantomData<A>,
     formatter: PhantomData<F>,
     /// The [Write](std::io::Write)able output stream.
     marker: PhantomData<C>,
 }
 
-pub struct FileOutputPlugin<C: Component + Clone, F: Format<C, BufWriter<File>>, A = Atom> {
+pub struct FileOutputPlugin<C: Component + Clone, F: Format<C, BufWriter<File>>> {
     c_marker: PhantomData<C>,
     f_marker: PhantomData<F>,
-    a_marker: PhantomData<A>,
     file_name: String,
     interval: u64,
 }
 
-impl<C, F, A> FileOutputPlugin<C, F, A>
+impl<C, F> FileOutputPlugin<C, F>
 where
     C: Component + Clone + Sync + Send,
-    A: Component + Sync + Send,
     F: Format<C, BufWriter<File>> + Sync + Send,
 {
     pub fn new(file_name: String, interval: u64) -> Self {
         FileOutputPlugin {
             c_marker: PhantomData,
             f_marker: PhantomData,
-            a_marker: PhantomData,
             file_name,
             interval,
         }
     }
 }
 
-impl<C, F, A> Plugin for FileOutputPlugin<C, F, A>
+impl<C, F> Plugin for FileOutputPlugin<C, F>
 where
     C: Component + Clone + Sync + Send + 'static,
-    A: Component + Sync + Send + 'static,
     F: Format<C, BufWriter<File>> + Sync + Send + 'static,
 {
     fn build(&self, app: &mut App) {
-        app.insert_resource(FileOutputResource::<C, F, A> {
+        app.insert_resource(FileOutputResource::<C, F> {
             interval: self.interval,
             file_name: self.file_name.clone(),
             stream: None,
-            atom_flag: PhantomData,
             formatter: PhantomData,
             marker: PhantomData,
         });
-        app.add_systems(Update, update_writers::<C, F, A>);
+        app.add_systems(Update, update_writers::<C, F>);
     }
 }
 
-fn update_writers<C, F, A>(
+fn update_writers<C, F>(
     step: Res<Step>,
-    mut outputter: ResMut<FileOutputResource<C, F, A>>,
-    query: Query<(Entity, &C), With<A>>,
+    mut outputter: ResMut<FileOutputResource<C, F>>,
+    query: Query<(Entity, &C, &Marker)>,
 ) where
     C: Component + Clone,
-    A: Component,
     F: Format<C, BufWriter<File>> + Send + Sync + 'static,
 {
     // if the stream is not opened, open it.
@@ -103,16 +97,19 @@ fn update_writers<C, F, A>(
     }
 
     if step.n % outputter.interval == 0 {
-        let atom_number = (query.into_iter()).count();
+        let filtered_atoms: Vec<_> = query
+            .iter()
+            .filter(|(_, _, marker)| marker.write_status == WriteOrNot::Write)
+            .collect();
+
         F::write_frame_header(
             outputter.stream.as_mut().expect("File writer not open"),
             step.n,
-            atom_number,
+            filtered_atoms.len(),
         )
         .expect("Could not write.");
 
-        // write each entity
-        for (ent, c) in query.iter() {
+        for (ent, c, _) in filtered_atoms {
             F::write_atom(
                 outputter.stream.as_mut().expect("File writer not open"),
                 ent,
