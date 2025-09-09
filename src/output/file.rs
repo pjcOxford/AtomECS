@@ -37,6 +37,11 @@ pub struct FileOutputResource<C: Component + Clone, F: Format<C, BufWriter<File>
     marker: PhantomData<C>,
 }
 
+/// A resource to signify whether atom need to be written to file only once or multiple times.
+/// Assumes that atoms need to be written on first appearance within the marker region.
+#[derive(Resource)]
+pub struct WriteOnce(pub bool);
+
 pub struct FileOutputPlugin<C: Component + Clone, F: Format<C, BufWriter<File>>> {
     c_marker: PhantomData<C>,
     f_marker: PhantomData<F>,
@@ -72,14 +77,16 @@ where
             formatter: PhantomData,
             marker: PhantomData,
         });
+        app.insert_resource(WriteOnce(false));
         app.add_systems(Update, update_writers::<C, F>);
     }
 }
 
 fn update_writers<C, F>(
     step: Res<Step>,
+    write_once: Res<WriteOnce>,
     mut outputter: ResMut<FileOutputResource<C, F>>,
-    query: Query<(Entity, &C, &Marker)>,
+    mut query: Query<(Entity, &C, &mut Marker<C>)>,
 ) where
     C: Component + Clone,
     F: Format<C, BufWriter<File>> + Send + Sync + 'static,
@@ -98,7 +105,7 @@ fn update_writers<C, F>(
 
     if step.n % outputter.interval == 0 {
         let filtered_atoms: Vec<_> = query
-            .iter()
+            .into_iter()
             .filter(|(_, _, marker)| marker.write_status == WriteOrNot::Write)
             .collect();
 
@@ -109,7 +116,11 @@ fn update_writers<C, F>(
         )
         .expect("Could not write.");
 
-        for (ent, c, _) in filtered_atoms {
+        for (ent, c, mut m) in filtered_atoms {
+            // if we are only writing once, set the marker to never write again.
+            if write_once.0 {
+                m.write_status = WriteOrNot::NeverWrite;
+            }
             F::write_atom(
                 outputter.stream.as_mut().expect("File writer not open"),
                 ent,

@@ -7,8 +7,7 @@ use std::marker::PhantomData;
 use lib::constant::PI;
 use lib::atom::{Atom, Position, Velocity};
 use lib::integrator::Timestep;
-use lib::output::file::FileOutputPlugin;
-use lib::output::file::Text;
+use lib::output::file::{FileOutputPlugin, Text, WriteOnce};
 use lib::simulation::SimulationBuilder;
 use lib::sim_region::{SimulationVolume, VolumeType};
 use lib::shapes::{Cylinder as MyCylinder, CylindricalPipe};
@@ -19,7 +18,7 @@ use lib::atom_sources::mass::{MassRatio, MassDistribution};
 use lib::atom_sources::oven::{OvenAperture, Oven};
 use lib::collisions::{CollisionPlugin, ApplyAtomCollisions, ApplyWallCollisions, NumberOfWallCollisions};
 use lib::collisions::wall_collisions::{WallData, WallType};
-use lib::marker::Marker;
+use lib::marker::MarkerConfig;
 
 fn main() {
     let now = Instant::now();
@@ -34,9 +33,12 @@ fn main() {
 
     sim.world_mut().insert_resource(ApplyAtomCollisions(false));
     sim.world_mut().insert_resource(ApplyWallCollisions(true));
-
-    let radius = 25e-6;
-    let length = 1000e-6;
+    sim.insert_resource(MarkerConfig {
+        pos_range: vec![(0.0, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
+        vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
+    });
+    sim.insert_resource(WriteOnce(true));
+    sim.insert_resource(WriteOnce(true));
 
     sim.world_mut()
         .spawn(WallData{
@@ -54,7 +56,7 @@ fn main() {
     let mut thetas = Vec::<f64>::new();
     let mut weights = Vec::<f64>::new();
 
-    let n = 10000;
+    let n = 1000;
     for i in 0..n {
         let theta = (i as f64) / (n as f64) * PI / 2.0;
         let weight = theta.sin() * theta.cos();
@@ -88,7 +90,7 @@ fn main() {
     sim.world_mut().insert_resource(VelocityCap {value: f64::MAX});
 
     // Run the simulation for a number of steps.
-    for _i in 0..3_000 {
+    for _i in 0..2_000 {
         sim.update();
     }
     println!("Simulation completed in {} ms.", now.elapsed().as_millis());

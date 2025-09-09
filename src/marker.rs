@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use std::marker::PhantomData;
 use crate::atom::{Position, Velocity};
 use crate::collisions::CollisionsSet;
 use crate::initiate::NewlyCreated;
@@ -8,10 +9,12 @@ use crate::integrator::AtomECSBatchStrategy;
 pub enum WriteOrNot {
     Write,
     NotWrite,
+    NeverWrite
 }
 #[derive(Component)]
-pub struct Marker {
-    pub write_status: WriteOrNot
+pub struct Marker<C: Component> {
+    pub write_status: WriteOrNot,
+    pub marker: PhantomData<C>,
 }
 
 #[derive(Resource)]
@@ -20,20 +23,27 @@ pub struct MarkerConfig {
     pub vel_range: Vec<(f64, f64)>,
 }
 
-pub fn init_marker_system (
+pub fn init_marker_system<C> (
     mut commands: Commands,
     query: Query<Entity, With<NewlyCreated>>
-) {
+) where C: Component + Clone, 
+{
     for entity in query.iter() {
-        commands.entity(entity).insert(Marker {write_status: WriteOrNot::NotWrite});
+        commands
+            .entity(entity)
+            .insert(Marker {
+                write_status: WriteOrNot::NotWrite,
+                marker: PhantomData::<C>
+            });
     }
 }
 
-pub fn update_marker_system(
-    mut query: Query<(&Position, &Velocity, &mut Marker)>,
+pub fn update_marker_system<C>(
+    mut query: Query<(&Position, &Velocity, &mut Marker<C>)>,
     config: Res<MarkerConfig>,
     batch_strategy: Res<AtomECSBatchStrategy>,
-) {
+) where C: Component + Clone 
+{
     query
         .par_iter_mut()
         .batching_strategy(batch_strategy.0.clone())
@@ -80,7 +90,9 @@ impl Plugin for MarkerPlugin {
             pos_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
             vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
         });
-        app.add_systems(PreUpdate, init_marker_system);
-        app.add_systems(PreUpdate, update_marker_system.after(CollisionsSet::WallCollisionSystems));
+        app.add_systems(PreUpdate, init_marker_system::<Position>);
+        app.add_systems(PreUpdate, init_marker_system::<Velocity>);
+        app.add_systems(PreUpdate, update_marker_system::<Position>.after(CollisionsSet::WallCollisionSystems));
+        app.add_systems(PreUpdate, update_marker_system::<Velocity>.after(CollisionsSet::WallCollisionSystems));
     }
 }
