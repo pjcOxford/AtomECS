@@ -28,43 +28,40 @@ pub struct MarkerConfig {
     pub vel_range: Vec<(f64, f64)>,
 }
 
-pub fn add_marker_system(
-    query: Query<(Entity, &Position, &Velocity), With<Atom>>,
+pub fn update_marker_system(
+    mut query: Query<(Entity, &Position, &Velocity, &mut Marker)>,
     config: Res<MarkerConfig>,
 ) {
-    for (entity, pos, vel) in query.iter() {
-        let mut add_marker = true;
-        for i in 0..3 {
-            if !(pos.pos.x < config.pos_range[i].1 && pos.pos.x > config.pos_range[i].0) {
-                add_marker = false;
-            }
-            if !(vel.vel.x < config.vel_range[i].1 && vel.vel.x > config.vel_range[i].0) {
-                add_marker = false;
-            }
-        }
-        if add_marker {
-            marker.write_status = WriteOrNot::Write;
-        }
-    }
-}
-
-pub fn remove_marker_system(
-    mut commands: Commands,
-    query: Query<(Entity, &Position, &Velocity), With<Atom>>,
-    config: Res<MarkerConfig>,
-) {
-    for (entity, pos, vel) in query.iter() {
-        let mut remove_marker = false;
-        for i in 0..3 {
-            if !(pos.pos.x < config.pos_range[i].1 && pos.pos.x > config.pos_range[i].0) {
-                remove_marker = true;
-            }
-            if !(vel.vel.x < config.vel_range[i].1 && vel.vel.x > config.vel_range[i].0) {
-                remove_marker = true;
-            }
-        }
-        if remove_marker {
-            commands.entity(entity).remove::<Marker>();
+    for (entity, pos, vel, mut marker) in query.iter_mut() {
+        match marker.write_status {
+            WriteOrNot::Write => {
+                let mut remove_marker = false;
+                for i in 0..3 {
+                    if !(pos.pos.x < config.pos_range[i].1 && pos.pos.x > config.pos_range[i].0) {
+                        remove_marker = true;
+                    }
+                    if !(vel.vel.x < config.vel_range[i].1 && vel.vel.x > config.vel_range[i].0) {
+                        remove_marker = true;
+                    }
+                }
+                if remove_marker {
+                    marker.write_status = WriteOrNot::NotWrite;
+                }
+            },
+            WriteOrNot::NotWrite => {
+                let mut add_marker = true;
+                for i in 0..3 {
+                    if !(pos.pos.x < config.pos_range[i].1 && pos.pos.x > config.pos_range[i].0) {
+                        add_marker = false;
+                    }
+                    if !(vel.vel.x < config.vel_range[i].1 && vel.vel.x > config.vel_range[i].0) {
+                        add_marker = false;
+                    }
+                }
+                if add_marker {
+                    marker.write_status = WriteOrNot::Write;
+                }
+            },
         }
     }
 }
@@ -77,7 +74,6 @@ impl Plugin for MarkerPlugin {
             vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
         });
         app.add_systems(PreUpdate, init_marker_system);
-        app.add_systems(PreUpdate, add_marker_system.after(CollisionsSet::WallCollisionSystems));
-        app.add_systems(PreUpdate, remove_marker_system.after(CollisionsSet::WallCollisionSystems));
+        app.add_systems(PreUpdate, update_marker_system.after(CollisionsSet::WallCollisionSystems));
     }
 }

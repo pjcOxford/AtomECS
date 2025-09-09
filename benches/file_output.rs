@@ -5,10 +5,10 @@ use criterion::{Criterion, criterion_group, criterion_main, black_box};
 use rand::Rng;
 use nalgebra::Vector3;
 use bevy::prelude::*;
-use lib::atom::{Atom, Position, Velocity};
-use lib::integrator::{Timestep, IntegrationPlugin};
+use lib::atom::{Atom, Position, Velocity, Force, Mass};
+use lib::integrator::{Timestep, IntegrationPlugin, OldForce};
 use lib::output::file::{FileOutputPlugin, Text};
-use lib::marker::{Marker, MarkerPlugin, MarkerConfig};
+use lib::marker::{Marker, MarkerPlugin, MarkerConfig, WriteOrNot};
 
 criterion_group!(benches, bench_simulation);
 criterion_main!{benches}
@@ -20,11 +20,11 @@ fn bench_simulation(c: &mut Criterion) {
             let mut rng = rand::rng();
             let mut app = App::new();
             
-            app.add_plugins(FileOutputPlugin::<Position, Text, Marker>::new("pos.txt".to_string(), 1));
+            app.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(), 1));
             app.add_plugins(MarkerPlugin);
             app.add_plugins(IntegrationPlugin);
 
-            app.insert_resource(Timestep { delta: 1e-7 });
+            app.insert_resource(Timestep { delta: 1e-3 });
             app.insert_resource(MarkerConfig {
                 pos_range: vec![(0.5, 0.75), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
                 vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
@@ -47,6 +47,10 @@ fn bench_simulation(c: &mut Criterion) {
                         ),
                     },
                     Atom,
+                    Force::default(),
+                    Mass {value: 1.0},
+                    OldForce(Force::default()),
+                    Marker {write_status: WriteOrNot::NotWrite},
                 ));
             }
             for _i in 0..300 {

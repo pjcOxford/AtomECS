@@ -7,13 +7,13 @@ use bevy::prelude::*;
 use lib::atom::{Atom, Position, Velocity, Force, Mass};
 use lib::integrator::{Timestep, IntegrationPlugin, OldForce};
 use lib::output::file::{FileOutputPlugin, Text};
-use lib::marker::{Marker, MarkerPlugin, MarkerConfig};
+use lib::marker::{Marker, MarkerPlugin, MarkerConfig, WriteOrNot};
 
 fn main() {
     let mut rng = rand::rng();
     let mut app = App::new();
 
-    app.add_plugins(FileOutputPlugin::<Position, Text, Marker>::new("pos.txt".to_string(), 1));
+    app.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(), 1));
     app.add_plugins(MarkerPlugin);
     app.add_plugins(IntegrationPlugin);
 
@@ -36,6 +36,7 @@ fn main() {
             Force::default(),
             Mass {value: 1.0},
             OldForce(Force::default()),
+            Marker {write_status: WriteOrNot::NotWrite},
             Atom,
         ));
     }
