@@ -11,10 +11,10 @@ use lib::integrator::{Timestep, IntegrationPlugin, OldForce};
 use lib::output::file::{FileOutputPlugin, Text};
 use lib::marker::{Marker, MarkerPlugin, MarkerConfig, WriteOrNot};
 
-criterion_group!(benches, bench_simulation);
+criterion_group!(benches, output_bench);
 criterion_main!{benches}
 
-fn bench_simulation(c: &mut Criterion) {
+fn output_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("file output");
     
     group.bench_function("add + remove", |b| {
@@ -26,13 +26,13 @@ fn bench_simulation(c: &mut Criterion) {
             app.add_plugins(MarkerPlugin);
             app.add_plugins(IntegrationPlugin);
 
-            app.insert_resource(Timestep { delta: 1e-3 });
+            app.insert_resource(Timestep { delta: 1e-2 });
             app.insert_resource(MarkerConfig {
-                pos_range: vec![(0.5, 0.75), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
+                pos_range: vec![(0.5, 0.6), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
                 vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
             });
 
-            for _ in 0..1000 {
+            for _ in 0..20_000 {
                 app.world_mut().spawn((
                     Position {
                         pos: Vector3::new(
@@ -52,9 +52,10 @@ fn bench_simulation(c: &mut Criterion) {
                     Force::default(),
                     Mass {value: 1.0},
                     OldForce(Force::default()),
+                    Marker {write_status: WriteOrNot::NotWrite},
                 ));
             }
-            for _i in 0..500 {
+            for _i in 0..100 {
                 app.update();
             }
         })
@@ -65,17 +66,17 @@ fn bench_simulation(c: &mut Criterion) {
             let mut rng = rand::rng();
             let mut app = App::new();
             
-            app.add_plugins(FileOutputPlugin::<Position, Text, Marker>::new("pos.txt".to_string(), 1));
+            app.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(), 1));
             app.add_plugins(MarkerPlugin);
             app.add_plugins(IntegrationPlugin);
 
             app.insert_resource(Timestep { delta: 1e-10 });
             app.insert_resource(MarkerConfig {
-                pos_range: vec![(0.5, 0.75), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
+                pos_range: vec![(0.5, 0.6), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
                 vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
             });
 
-            for _ in 0..1000 {
+            for _ in 0..20_000 {
                 app.world_mut().spawn((
                     Position {
                         pos: Vector3::new(
@@ -95,9 +96,10 @@ fn bench_simulation(c: &mut Criterion) {
                     Force::default(),
                     Mass {value: 1.0},
                     OldForce(Force::default()),
+                    Marker {write_status: WriteOrNot::NotWrite},
                 ));
             }
-            for _i in 0..500 {
+            for _i in 0..100 {
                 app.update();
             }
         })
