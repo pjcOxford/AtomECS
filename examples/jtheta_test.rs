@@ -19,6 +19,7 @@ use lib::atom_sources::mass::{MassRatio, MassDistribution};
 use lib::atom_sources::oven::{OvenAperture, Oven};
 use lib::collisions::{CollisionPlugin, ApplyAtomCollisions, ApplyWallCollisions, NumberOfWallCollisions};
 use lib::collisions::wall_collisions::{WallData, WallType};
+use lib::marker::Marker;
 
 fn main() {
     let now = Instant::now();
@@ -41,7 +42,7 @@ fn main() {
         .spawn(WallData{
             wall_type: WallType::Rough})
         .insert(CylindricalPipe::new(radius, length, Vector3::new(1.0, 0.0, 0.0)))
-        .insert(Position{pos: Vector3::new(-500e-6, 0.0, 0.0)});
+        .insert(Position{pos: Vector3::new(-length / 2.0, 0.0, 0.0)});
 
     sim.world_mut()
         .spawn(SimulationVolume{volume_type: VolumeType::Inclusive})
