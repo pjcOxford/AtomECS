@@ -97,12 +97,10 @@ impl CollisionBox {
                 let v2 = self.entity_velocities[idx2].1;
                 let vel_rel = (v1 - v2).norm();
                 if vel_rel > 2.0 * max_speed {
-                    println!("!");
                     num_checks_left += (self.particle_number as f64 - 1.0) * density * params.sigma * (vel_rel - 2.0 * max_speed) * dt / 2.0 ;
                     max_speed = vel_rel / 2.0;
                 }
                 let prob_collision =  vel_rel / (2.0 * max_speed);
-                // println!("{}", (v1 -v2).norm());
                 let collide = rng.random_bool(prob_collision);
                 if collide {
                     let (v1new, v2new) = do_collision(v1, v2);
@@ -200,7 +198,7 @@ fn do_collision(mut v1: Vector3<f64>, mut v2: Vector3<f64>) -> (Vector3<f64>, Ve
 
     // Randomly modify velocities in CoM frame, conserving energy & momentum
     let vcm = 0.5 * (v1 + v2);
-    let energy: f64 = 0.5 * ((v1 - vcm).norm().powi(2) + (v2 - vcm).norm().powi(2));
+    let energy: f64 = 0.5 * ((v1 - vcm).norm_squared() + (v2 - vcm).norm_squared());
 
     let cos_theta: f64 = rng.random_range(-1.0..1.0);
     let sin_theta: f64 = (1.0 - cos_theta.powi(2)).sqrt();
