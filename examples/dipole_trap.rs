@@ -23,8 +23,8 @@ fn main() {
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(LaserPlugin::<{BEAM_NUMBER}>);
     sim_builder.add_plugins(DipolePlugin::<{BEAM_NUMBER}>);
-    sim_builder.add_plugins(FileOutputPlugin::<Position, Text, Atom>::new("pos.txt".to_string(), 100));
-    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text, Atom>::new("vel.txt".to_string(), 100));
+    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(), 100));
+    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(), 100));
 
     // I am unclear on whether to implement XYZPosition for Position or whether the intent was to deprecate XYZ format. 
     // Commenting out for the time being.

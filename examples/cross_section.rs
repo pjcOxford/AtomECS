@@ -24,8 +24,8 @@ fn main() {
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(LaserPlugin::<{BEAM_NUMBER}>);
     sim_builder.add_plugins(LaserCoolingPlugin::<Rubidium87_780D2, {BEAM_NUMBER}>::default());
-    sim_builder.add_plugins(FileOutputPlugin::<ExpectedPhotonsScatteredVector<Rubidium87_780D2, {BEAM_NUMBER}>, Text, Atom>::new("scattered.txt".to_string(), 2));
-    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text, Atom>::new("vel.txt".to_string(), 10));
+    sim_builder.add_plugins(FileOutputPlugin::<ExpectedPhotonsScatteredVector<Rubidium87_780D2, {BEAM_NUMBER}>, Text>::new("scattered.txt".to_string(), 2));
+    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(), 10));
     let mut sim = sim_builder.build();
 
     // Set the intensity equal to Isat.

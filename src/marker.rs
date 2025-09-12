@@ -9,6 +9,7 @@ pub enum WriteOrNot {
     NotWrite,
     NeverWrite
 }
+
 #[derive(Component)]
 pub struct Marker {
     pub write_status: WriteOrNot,
@@ -18,6 +19,15 @@ pub struct Marker {
 pub struct MarkerConfig {
     pub pos_range: Vec<(f64, f64)>,
     pub vel_range: Vec<(f64, f64)>,
+}
+
+impl Default for MarkerConfig {
+    fn default() -> Self {
+        MarkerConfig {
+            pos_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
+            vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
+        }
+    }
 }
 
 /// A resource to signify whether atom need to be written to file only once or multiple times.
@@ -91,10 +101,9 @@ fn dont_write_to_written_once_atoms_system (
 pub struct MarkerPlugin;
 impl Plugin for MarkerPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(MarkerConfig {
-            pos_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
-            vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
-        });
+        app.insert_resource(MarkerConfig::default());
+        app.insert_resource(WriteOnce(false));
+        app.insert_resource(Interval(1));
         app.add_systems(PreUpdate, update_marker_system.after(CollisionsSet::WallCollisionSystems));
         app.add_systems(PostUpdate, dont_write_to_written_once_atoms_system);
     }

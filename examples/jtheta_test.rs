@@ -24,7 +24,7 @@ fn main() {
     let now = Instant::now();
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(AtomSourcePlugin::<Strontium88>::default());
-    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(),10));
+    // sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(),10));
     sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(),10));
     sim_builder.add_plugins(CollisionPlugin);
 
@@ -89,7 +89,7 @@ fn main() {
     sim.world_mut().insert_resource(VelocityCap {value: f64::MAX});
 
     // Run the simulation for a number of steps.
-    for _i in 0..20_000 {
+    for _i in 0..5_000 {
         sim.update();
     }
     println!("Simulation completed in {} ms.", now.elapsed().as_millis());

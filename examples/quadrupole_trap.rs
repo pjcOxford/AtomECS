@@ -20,11 +20,11 @@ fn main() {
     let now = Instant::now();
 
     let mut sim_builder = SimulationBuilder::default();
-    sim_builder.add_plugins(FileOutputPlugin::<Position, Text, Atom>::new(
+    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new(
         "pos.txt".to_string(),
         100,
     ));
-    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text, Atom>::new(
+    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new(
         "vel.txt".to_string(),
         100,
     ));
