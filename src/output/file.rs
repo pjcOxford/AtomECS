@@ -3,7 +3,6 @@
 //! To add file output to your simulation, add one or more `FileOutputPlugin`s, which determine
 //! the component written to file and the output format used.
 
-use crate::atom::Atom;
 use crate::integrator::Step;
 use crate::marker::{Marker, WriteOrNot};
 use bevy::prelude::*;
@@ -36,11 +35,6 @@ pub struct FileOutputResource<C: Component + Clone, F: Format<C, BufWriter<File>
     /// The [Write](std::io::Write)able output stream.
     marker: PhantomData<C>,
 }
-
-/// A resource to signify whether atom need to be written to file only once or multiple times.
-/// Assumes that atoms need to be written on first appearance within the marker region.
-#[derive(Resource)]
-pub struct WriteOnce(pub bool);
 
 pub struct FileOutputPlugin<C: Component + Clone, F: Format<C, BufWriter<File>>> {
     c_marker: PhantomData<C>,
@@ -77,16 +71,14 @@ where
             formatter: PhantomData,
             marker: PhantomData,
         });
-        app.insert_resource(WriteOnce(false));
         app.add_systems(Update, update_writers::<C, F>);
     }
 }
 
 fn update_writers<C, F>(
     step: Res<Step>,
-    write_once: Res<WriteOnce>,
     mut outputter: ResMut<FileOutputResource<C, F>>,
-    mut query: Query<(Entity, &C, &mut Marker<C>)>,
+    query: Query<(Entity, &C, &Marker)>,
 ) where
     C: Component + Clone,
     F: Format<C, BufWriter<File>> + Send + Sync + 'static,
@@ -105,7 +97,7 @@ fn update_writers<C, F>(
 
     if step.n % outputter.interval == 0 {
         let filtered_atoms: Vec<_> = query
-            .into_iter()
+            .iter()
             .filter(|(_, _, marker)| marker.write_status == WriteOrNot::Write)
             .collect();
 
@@ -116,11 +108,7 @@ fn update_writers<C, F>(
         )
         .expect("Could not write.");
 
-        for (ent, c, mut m) in filtered_atoms {
-            // if we are only writing once, set the marker to never write again.
-            if write_once.0 {
-                m.write_status = WriteOrNot::NeverWrite;
-            }
+        for (ent, c, _) in filtered_atoms {
             F::write_atom(
                 outputter.stream.as_mut().expect("File writer not open"),
                 ent,

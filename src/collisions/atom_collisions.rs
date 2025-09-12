@@ -18,7 +18,7 @@ use nalgebra::Vector3;
 use rand::Rng;
 use bevy::prelude::*;
 use crate::atom::{Position, Velocity, Atom};
-use crate::constant::{PI, SQRT2};
+use crate::constant::PI;
 use crate::integrator::Timestep;
 use crate::collisions::spatial_grid::BoxID;
 

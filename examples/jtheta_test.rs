@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use lib::constant::PI;
 use lib::atom::{Atom, Position, Velocity};
 use lib::integrator::Timestep;
-use lib::output::file::{FileOutputPlugin, Text, WriteOnce};
+use lib::output::file::{FileOutputPlugin, Text};
 use lib::simulation::SimulationBuilder;
 use lib::sim_region::{SimulationVolume, VolumeType};
 use lib::shapes::{Cylinder as MyCylinder, CylindricalPipe};
@@ -16,9 +16,9 @@ use lib::atom_sources::{AtomSourcePlugin, WeightedProbabilityDistribution, Veloc
 use lib::atom_sources::emit::{EmitFixedRate, AtomNumberToEmit};
 use lib::atom_sources::mass::{MassRatio, MassDistribution};
 use lib::atom_sources::oven::{OvenAperture, Oven};
-use lib::collisions::{CollisionPlugin, ApplyAtomCollisions, ApplyWallCollisions, NumberOfWallCollisions};
+use lib::collisions::{CollisionPlugin, ApplyAtomCollisions, ApplyWallCollisions};
 use lib::collisions::wall_collisions::{WallData, WallType};
-use lib::marker::MarkerConfig;
+use lib::marker::{MarkerConfig, WriteOnce, Interval};
 
 fn main() {
     let now = Instant::now();
@@ -26,7 +26,6 @@ fn main() {
     sim_builder.add_plugins(AtomSourcePlugin::<Strontium88>::default());
     sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(),10));
     sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(),10));
-    // sim_builder.add_plugins(FileOutputPlugin::<NumberOfWallCollisions, Text, Atom>::new("wall_collisions.txt".to_string(),1));
     sim_builder.add_plugins(CollisionPlugin);
 
     let mut sim = sim_builder.build();
@@ -38,7 +37,7 @@ fn main() {
         vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
     });
     sim.insert_resource(WriteOnce(true));
-    sim.insert_resource(WriteOnce(true));
+    sim.insert_resource(Interval(10));
 
     sim.world_mut()
         .spawn(WallData{
@@ -90,7 +89,7 @@ fn main() {
     sim.world_mut().insert_resource(VelocityCap {value: f64::MAX});
 
     // Run the simulation for a number of steps.
-    for _i in 0..2_000 {
+    for _i in 0..20_000 {
         sim.update();
     }
     println!("Simulation completed in {} ms.", now.elapsed().as_millis());
