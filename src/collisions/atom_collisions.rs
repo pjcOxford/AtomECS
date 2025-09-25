@@ -33,6 +33,13 @@ pub struct CollisionBox {
     pub particle_number: i32,
 }
 
+/// Resource that gives the collisional cross section in m^2
+/// Hope is temporary
+#[derive(Resource)]
+pub struct CrossSection {
+    pub sigma: f64,
+}
+
 impl Default for CollisionBox {
     fn default() -> Self {
         CollisionBox {
@@ -49,7 +56,7 @@ impl Default for CollisionBox {
 
 impl CollisionBox {
     /// Perform collisions within a box.
-    fn do_collisions(&mut self, params: CollisionParameters, dt: f64) {
+    fn do_collisions(&mut self, params: CollisionParameters, sigma: f64, dt: f64) {
         let mut rng = rand::rng();
         self.particle_number = self.entity_velocities.len() as i32;
         self.atom_number = self.particle_number as f64 * params.macroparticle;
@@ -71,7 +78,7 @@ impl CollisionBox {
         // and since we assume these are identical particles we must divide by two since otherwise we count each collision twice
         let density = self.atom_number / params.box_width.powi(3);
         self.expected_collision_checks =
-            (self.particle_number as f64 - 1.0) * density * params.sigma * max_speed * dt;
+            (self.particle_number as f64 - 1.0) * density * sigma * max_speed * dt;
 
         let mut num_checks_left: f64 = self.expected_collision_checks;
 
@@ -97,7 +104,7 @@ impl CollisionBox {
                 let v2 = self.entity_velocities[idx2].1;
                 let vel_rel = (v1 - v2).norm();
                 if vel_rel > 2.0 * max_speed {
-                    num_checks_left += (self.particle_number as f64 - 1.0) * density * params.sigma * (vel_rel - 2.0 * max_speed) * dt / 2.0 ;
+                    num_checks_left += (self.particle_number as f64 - 1.0) * density * sigma * (vel_rel - 2.0 * max_speed) * dt / 2.0 ;
                     max_speed = vel_rel / 2.0;
                 }
                 let prob_collision =  vel_rel / (2.0 * max_speed);
@@ -125,8 +132,6 @@ pub struct CollisionParameters {
     pub box_number: i64,
     /// width of one box in m
     pub box_width: f64,
-    // collisional cross section of atoms (assuming only one species)
-    pub sigma: f64,
     /// Limit on number of collisions per box each frame. If the number of collisions to calculate exceeds this, the simulation will panic.
     pub collision_limit: f64,
 }
@@ -148,6 +153,7 @@ pub fn apply_collisions_system(
     timestep: Res<Timestep>,
     params: Res<CollisionParameters>,
     mut tracker: ResMut<CollisionsTracker>,
+    sigma: Res<CrossSection>,
 ) {
     use rayon::prelude::*;
     // insert atom velocity into hash
@@ -165,7 +171,7 @@ pub fn apply_collisions_system(
     // (Note that using hashmap parallel values mut does not work in parallel, tested.)
     let boxes: Vec<&mut CollisionBox> = map.values_mut().collect();
     boxes.into_par_iter().for_each(|collision_box| {
-        collision_box.do_collisions(*params, timestep.delta);
+        collision_box.do_collisions(*params, sigma.sigma, timestep.delta);
     });
 
     // Write back values.
@@ -288,7 +294,7 @@ mod tests {
 
             let atom_number = params.macroparticle * 2.0 * MACRO_ATOM_NUMBER as f64;
             let density = atom_number / params.box_width.powi(3);
-            let expected_number = (collision_box.particle_number as f64 - 1.0) * density * params.sigma * (v1 - v2).norm() * dt / 4.0;
+            let expected_number = (collision_box.particle_number as f64 - 1.0) * density * sigma * (v1 - v2).norm() * dt / 4.0;
             expected_collision += expected_number;
             actual_collision += collision_box.collision_number as f64;
             assert_eq!(collision_box.particle_number, 2 * MACRO_ATOM_NUMBER as i32);

@@ -24,7 +24,6 @@ fn main() {
     let now = Instant::now();
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(AtomSourcePlugin::<Strontium88>::default());
-    // sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(),10));
     sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(),10));
     sim_builder.add_plugins(CollisionPlugin);
 
@@ -38,6 +37,9 @@ fn main() {
     });
     sim.insert_resource(WriteOnce(true));
     sim.insert_resource(Interval(10));
+
+    let radius = 25e-6;
+    let length = 1000e-6;
 
     sim.world_mut()
         .spawn(WallData{
