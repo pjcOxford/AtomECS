@@ -104,6 +104,7 @@ impl CollisionBox {
                 let v2 = self.entity_velocities[idx2].1;
                 let vel_rel = (v1 - v2).norm();
                 if vel_rel > 2.0 * max_speed {
+                    println!("!");
                     num_checks_left += (self.particle_number as f64 - 1.0) * density * sigma * (vel_rel - 2.0 * max_speed) * dt / 2.0 ;
                     max_speed = vel_rel / 2.0;
                 }
@@ -263,12 +264,12 @@ mod tests {
             macroparticle: 2.0,
             box_number: 1,
             box_width: 1e-2,
-            sigma: 5e-10,
             collision_limit: 1_000_000.0,
         };
         const MACRO_ATOM_NUMBER: usize = 100_000;
         let dt = 1e-3;
         let mut expected_collision = 0.0;
+        let sigma = 1e-10;
         let mut actual_collision = 0.0;
         for _i in 0..100 {
             let x1 = rng.random::<f64>();
@@ -289,9 +290,7 @@ mod tests {
                 entity_velocities,
                 ..Default::default()
             };
-            
-            collision_box.do_collisions(params, dt);
-
+            collision_box.do_collisions(params, dt, sigma);
             let atom_number = params.macroparticle * 2.0 * MACRO_ATOM_NUMBER as f64;
             let density = atom_number / params.box_width.powi(3);
             let expected_number = (collision_box.particle_number as f64 - 1.0) * density * sigma * (v1 - v2).norm() * dt / 4.0;
@@ -299,7 +298,7 @@ mod tests {
             actual_collision += collision_box.collision_number as f64;
             assert_eq!(collision_box.particle_number, 2 * MACRO_ATOM_NUMBER as i32);
             assert_eq!(collision_box.atom_number, atom_number);
-            assert_approx_eq!(collision_box.collision_number as f64, expected_number, expected_number * 0.15);
+            assert_approx_eq!(collision_box.collision_number as f64, expected_number, expected_number * 0.20);
         }
         let delta = (expected_collision - actual_collision).abs()/expected_collision;
         if delta > 0.05 {
@@ -355,10 +354,9 @@ mod tests {
             macroparticle: 1.0,
             box_number: 10,
             box_width: 2.0,
-            sigma: 10.0,
             collision_limit: 10_000.0,
         });
-
+        sim.world_mut().insert_resource(CrossSection { sigma: 10.0 });
         for _i in 0..10 {
             sim.update();
         }

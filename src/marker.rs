@@ -103,7 +103,7 @@ impl Plugin for MarkerPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(MarkerConfig::default());
         app.insert_resource(WriteOnce(false));
-        app.insert_resource(Interval(1));
+        app.insert_resource(Interval(u64::MAX));
         app.add_systems(PreUpdate, update_marker_system.after(CollisionsSet::WallCollisionSystems));
         app.add_systems(PostUpdate, dont_write_to_written_once_atoms_system);
     }

@@ -15,7 +15,7 @@ use std::time::Instant;
 use lib::shapes::Sphere as MySphere;
 use lib::collisions::wall_collisions::{WallData, WallType};
 use lib::collisions::CollisionPlugin;
-use lib::collisions::atom_collisions::{CollisionParameters, CollisionsTracker};
+use lib::collisions::atom_collisions::{CollisionParameters, CollisionsTracker, CrossSection};
 use lib::sim_region::{SimulationVolume, VolumeType};
 
 fn main() {
@@ -56,11 +56,10 @@ fn main() {
         box_number: 100, //Any number large enough to cover entire cloud with collision boxes. Overestimating box number will not affect performance.
         box_width: 1e-2, //Too few particles per box will both underestimate collision rate and cause large statistical fluctuations.
         //Boxes must also be smaller than typical length scale of density variations within the cloud, since the collisions model treats gas within a box as homogeneous.
-        sigma: 3.5e-16, //Approximate collisional cross section of Rb87
         collision_limit: 10_000_000.0, //Maximum number of collisions that can be calculated in one frame.
                                        //This avoids absurdly high collision numbers if many atoms are initialised with the same position, for example.
     });
-
+    sim.world_mut().insert_resource(CrossSection { sigma: 3.5e-16 }); 
     sim.world_mut().insert_resource(CollisionsTracker {
         num_collisions: Vec::new(),
         num_atoms: Vec::new(),
