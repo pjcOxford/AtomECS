@@ -86,7 +86,7 @@ pub fn calculate_two_level_population<const N: usize, T: TransitionComponent>(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use super::*;
     use crate::{

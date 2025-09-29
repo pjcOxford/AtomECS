@@ -112,7 +112,8 @@ where
     }
 }
 
-pub mod tests {
+#[cfg(test)]
+mod tests {
     use super::*;
 
     #[derive(Clone, Lerp, Component)]

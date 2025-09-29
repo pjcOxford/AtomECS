@@ -1,3 +1,10 @@
+//! Wall collision system.
+//! Handles specular and diffuse reflections, as well as random and exponential mixtures of the two.
+//! Works with spheres, cuboids, cylinders, and cylindrical pipes.
+//! Does not work with forces/accelerations, or multiple walls.
+//! Will miss some collisions if (passing through the wall in a single timestep).
+//! Best to only use with closed volumes, with atoms initialized inside the volume, or the cylindrical pipe, initialized inside the pipe.
+
 use super::LambertianProbabilityDistribution;
 use crate::atom::{Atom, Position, Velocity};
 use crate::collisions::wall_collision_info::*;
@@ -147,10 +154,13 @@ fn collision_check<T: Wall + Intersect + Normal>(
         tolerance,
         max_steps,
     ) {
-        if let Some(collision_normal) =
+        if let Some(mut collision_normal) =
             shape.calculate_normal(&collision_point, &wall_pos.pos, tolerance)
         {
             collision_point += 1e-10 * collision_normal; // Offset collision point along normal to avoid numerical issues
+            if collision_normal.dot(&atom_vel.vel) >= 0.0 {
+                collision_normal = -collision_normal; // Ensure normal is against velocity
+            }
             Some(CollisionInfo {
                 atom: atom_entity,
                 wall: wall_entity,

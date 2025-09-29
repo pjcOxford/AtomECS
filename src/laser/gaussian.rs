@@ -237,7 +237,7 @@ pub fn get_gaussian_beam_intensity_gradient(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use super::*;
     use crate::constant::PI;

@@ -60,7 +60,7 @@ pub fn sample_gaussian_laser_intensity_gradient<const N: usize, FilterT>(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
     use assert_approx_eq::assert_approx_eq;
     use nalgebra::Vector3;

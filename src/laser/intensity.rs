@@ -116,7 +116,7 @@ pub fn sample_laser_intensities<const N: usize, FilterT>(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use super::*;
     use crate::laser::gaussian;

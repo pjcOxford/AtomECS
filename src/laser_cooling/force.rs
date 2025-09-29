@@ -148,7 +148,7 @@ pub fn calculate_emission_forces<const N: usize, T: TransitionComponent>(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::CoolingLight;
     use super::*;
     use crate::constant::{HBAR, PI};

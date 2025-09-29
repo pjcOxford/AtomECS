@@ -41,7 +41,7 @@ impl Plugin for GravityPlugin {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use super::*;
     use assert_approx_eq::assert_approx_eq;

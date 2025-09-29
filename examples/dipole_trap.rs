@@ -8,7 +8,7 @@ use lib::integrator::Timestep;
 use lib::laser::gaussian::GaussianBeam;
 use lib::laser::{self, LaserPlugin, RequiresIntensityGradientCalculation};
 use lib::output::file::FileOutputPlugin;
-use lib::output::file::{Text, XYZ};
+use lib::output::file::Text;
 use lib::simulation::SimulationBuilder;
 use nalgebra::Vector3;
 use std::time::Instant;
@@ -30,10 +30,6 @@ fn main() {
         "vel.txt".to_string(),
         100,
     ));
-
-    // I am unclear on whether to implement XYZPosition for Position or whether the intent was to deprecate XYZ format.
-    // Commenting out for the time being.
-    // sim_builder.add_plugins(FileOutputPlugin::<Position, XYZ, Atom>::new("position.xyz".to_string(), 100));
     let mut sim = sim_builder.build();
 
     // Create dipole laser.

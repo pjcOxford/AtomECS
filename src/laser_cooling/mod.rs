@@ -226,7 +226,7 @@ where
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use crate::{laser::index::LaserIndex, species::Rubidium87_780D2};
 

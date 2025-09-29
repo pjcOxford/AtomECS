@@ -104,7 +104,7 @@ pub fn calculate_laser_detuning<const N: usize, T: TransitionComponent>(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
     use crate::{
         laser_cooling::{doppler::DopplerShiftSampler, transition::AtomicTransition},

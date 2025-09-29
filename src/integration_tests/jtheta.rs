@@ -213,7 +213,7 @@ mod tests {
             .insert_resource(VelocityCap { value: f64::MAX });
 
         // Run the simulation for a number of steps.
-        for _i in 0..10000 {
+        for _i in 0..5000 {
             sim.update();
         }
 

@@ -10,7 +10,9 @@
 //! We assume a single species of atom, with a constant (not velocity dependent) collisional cross-section.
 //! We cannot have too few particles per box: the current implementation allows the same number of particles to collide multiple times,
 //! the effect of which is exacerbated in cells with few particles.
-//!
+//! The density of the cloud may be underestimate if the boxes are too large, compared to size of the cloud.
+//! The box number should be chosed carefully that the boxes cover the sim region in a proper way. (Even box number will be initialized with 8 boxes
+//! having a vertex at the origin, odd box number will be initialized with a box centered at the origin.)
 //!
 
 use crate::atom::{Atom, Position, Velocity};

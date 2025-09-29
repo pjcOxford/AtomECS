@@ -85,7 +85,7 @@ pub struct DopplerShiftSamplers<const N: usize> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use super::*;
     use crate::constant::PI;

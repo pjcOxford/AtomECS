@@ -155,7 +155,7 @@ impl Plugin for SimulationRegionPlugin {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
     use crate::atom::Position;
     use crate::shapes::{Cuboid, Sphere};

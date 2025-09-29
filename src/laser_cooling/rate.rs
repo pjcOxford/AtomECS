@@ -116,7 +116,7 @@ pub fn calculate_rate_coefficients<const N: usize, T>(
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
 
     use super::*;
 

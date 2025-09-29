@@ -35,7 +35,7 @@ pub fn index_lasers(mut query: Query<&mut LaserIndex>) {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
 
     #[test]
