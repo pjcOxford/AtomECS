@@ -8,14 +8,14 @@ pub trait AtomCreationModifier {
     /// Modifies the created atom
     fn mutate(commands: &mut Commands, new_atom: Entity);
 }
-pub trait AtomCreator : AtomCreationModifier + Copy + Send + Sync + Default {}
-impl<T> AtomCreator for T where T : AtomCreationModifier + Copy + Send + Sync + Default {}
+pub trait AtomCreator: AtomCreationModifier + Copy + Send + Sync + Default {}
+impl<T> AtomCreator for T where T: AtomCreationModifier + Copy + Send + Sync + Default {}
 
-pub trait Species : AtomCreator {}
-impl<T> Species for T where T : AtomCreator {}
+pub trait Species: AtomCreator {}
+impl<T> Species for T where T: AtomCreator {}
 
 /// Generates a species struct that can be used in an atom source.
-/// 
+///
 /// # Arguments:
 /// * `species_name`: name of the generated struct.
 /// * `transition`: laser cooling transition to use.

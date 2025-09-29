@@ -1,7 +1,7 @@
 //! Uniform magnetic fields
-use bevy::prelude::*;
 use super::analytic::AnalyticField;
 use crate::ramp::Lerp;
+use bevy::prelude::*;
 use nalgebra::Vector3;
 
 /// A component representing a uniform bias field, of the form `B = [ B_x, B_y, B_z ]`

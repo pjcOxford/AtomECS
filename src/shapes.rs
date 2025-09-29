@@ -1,9 +1,9 @@
 //! Support for different shapes.
 
+use bevy::prelude::*;
 use nalgebra::Vector3;
 use rand;
 use rand::Rng;
-use bevy::prelude::*;
 
 pub trait Volume {
     fn contains(&self, volume_position: &Vector3<f64>, entity_position: &Vector3<f64>) -> bool;
@@ -68,7 +68,8 @@ impl Surface for Cylinder {
     ) -> (Vector3<f64>, Vector3<f64>) {
         // Should we spawn a point on the ends or the sleeve?
         let mut rng = rand::rng();
-        let spawn_on_ends = rng.random_range(0.0..1.0) < (self.radius / (self.length + self.radius));
+        let spawn_on_ends =
+            rng.random_range(0.0..1.0) < (self.radius / (self.length + self.radius));
 
         if spawn_on_ends {
             //pick a side

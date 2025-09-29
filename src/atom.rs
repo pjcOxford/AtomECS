@@ -6,7 +6,7 @@
 //use crate::output::file::XYZPosition;
 //use crate::ramp::Lerp;
 use bevy::prelude::*;
-use nalgebra::{Vector3};
+use nalgebra::Vector3;
 
 //use serde::{Deserialize, Serialize};
 use std::fmt;

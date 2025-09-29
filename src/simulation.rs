@@ -4,8 +4,8 @@ use bevy::{app::TaskPoolThreadAssignmentPolicy, log::LogPlugin, prelude::*};
 
 use crate::{
     destructor::DestroyAtomsPlugin, gravity::GravityPlugin, initiate::InitiatePlugin,
-    integrator::IntegrationPlugin, magnetic::MagneticsPlugin,
-    output::console_output::console_output, sim_region::SimulationRegionPlugin, marker::MarkerPlugin,
+    integrator::IntegrationPlugin, magnetic::MagneticsPlugin, marker::MarkerPlugin,
+    output::console_output::console_output, sim_region::SimulationRegionPlugin,
 };
 
 /// Used to construct a simulation in AtomECS.

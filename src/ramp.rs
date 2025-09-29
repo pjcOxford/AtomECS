@@ -12,8 +12,8 @@
 //!   * The struct implements `Clone`.
 //!   * The fields can all be multiplied by an f64 and added (eg `f64` and `Vector3<f64>` types).
 
-use bevy::prelude::*;
 use bevy::ecs::component::Mutable;
+use bevy::prelude::*;
 
 use crate::integrator::{AtomECSBatchStrategy, Step, Timestep};
 use std::marker::PhantomData;
@@ -177,7 +177,11 @@ pub mod tests {
             keyframes: frames,
         };
 
-        let test_entity = app.world_mut().spawn(ALerpComp { value: 0.0 }).insert(ramp).id();
+        let test_entity = app
+            .world_mut()
+            .spawn(ALerpComp { value: 0.0 })
+            .insert(ramp)
+            .id();
 
         let dt = 0.1;
         app.world_mut().insert_resource(Timestep { delta: dt });

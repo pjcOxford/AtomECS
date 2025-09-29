@@ -66,7 +66,7 @@ fn main() {
     //app.add_startup_system(setup_world);
 
     // TODO: Configure bevy compute pool size
-    
+
     // Enabling the task pool plugin with custom thread assignment policy settings,
     // requires the regex features to be enabled in Cargo.toml. This seems to perform the same as the default settings.
     let task_pool_options = TaskPoolOptions {
@@ -97,12 +97,9 @@ fn main() {
             on_thread_destroy: None,
         },
     };
-    
+
     app.add_plugins(
-        DefaultPlugins
-        .set(TaskPoolPlugin {
-            task_pool_options
-        }),
+        DefaultPlugins.set(TaskPoolPlugin { task_pool_options }),
         // .set(LogPlugin {
         //     level: Level::DEBUG,
         //     filter: "bevy_core=trace".to_string(),
@@ -241,7 +238,8 @@ fn main() {
     // Enable fluctuation options
     //  * Allow photon numbers to fluctuate.
     //  * Allow random force from emission of photons.
-    app.world_mut().insert_resource(EmissionForceOption::default());
+    app.world_mut()
+        .insert_resource(EmissionForceOption::default());
     app.world_mut()
         .insert_resource(ScatteringFluctuationsOption::default());
 

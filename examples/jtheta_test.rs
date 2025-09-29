@@ -1,30 +1,33 @@
 extern crate atomecs as lib;
 extern crate nalgebra;
-use nalgebra::Vector3;
 use bevy::prelude::*;
-use std::time::Instant;
-use std::marker::PhantomData;
-use lib::constant::PI;
-use lib::atom::{Atom, Position, Velocity};
-use lib::integrator::Timestep;
-use lib::output::file::{FileOutputPlugin, Text};
-use lib::simulation::SimulationBuilder;
-use lib::sim_region::{SimulationVolume, VolumeType};
-use lib::shapes::{Cylinder as MyCylinder, CylindricalPipe};
-use lib::species::Strontium88;
-use lib::atom_sources::{AtomSourcePlugin, WeightedProbabilityDistribution, VelocityCap};
-use lib::atom_sources::emit::{EmitFixedRate, AtomNumberToEmit};
-use lib::atom_sources::mass::{MassRatio, MassDistribution};
-use lib::atom_sources::oven::{OvenAperture, Oven};
-use lib::collisions::{CollisionPlugin, ApplyAtomCollisions, ApplyWallCollisions};
+use lib::atom::{Position, Velocity};
+use lib::atom_sources::emit::{AtomNumberToEmit, EmitFixedRate};
+use lib::atom_sources::mass::{MassDistribution, MassRatio};
+use lib::atom_sources::oven::{Oven, OvenAperture};
+use lib::atom_sources::{AtomSourcePlugin, VelocityCap, WeightedProbabilityDistribution};
 use lib::collisions::wall_collisions::{WallData, WallType};
-use lib::marker::{MarkerConfig, WriteOnce, Interval};
+use lib::collisions::{ApplyAtomCollisions, ApplyWallCollisions, CollisionPlugin};
+use lib::constant::PI;
+use lib::integrator::Timestep;
+use lib::marker::{Interval, MarkerConfig, WriteOnce};
+use lib::output::file::{FileOutputPlugin, Text};
+use lib::shapes::{Cylinder as MyCylinder, CylindricalPipe};
+use lib::sim_region::{SimulationVolume, VolumeType};
+use lib::simulation::SimulationBuilder;
+use lib::species::Strontium88;
+use nalgebra::Vector3;
+use std::marker::PhantomData;
+use std::time::Instant;
 
 fn main() {
     let now = Instant::now();
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(AtomSourcePlugin::<Strontium88>::default());
-    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(),10));
+    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new(
+        "vel.txt".to_string(),
+        10,
+    ));
     sim_builder.add_plugins(CollisionPlugin);
 
     let mut sim = sim_builder.build();
@@ -33,7 +36,11 @@ fn main() {
     sim.world_mut().insert_resource(ApplyWallCollisions(true));
     sim.insert_resource(MarkerConfig {
         pos_range: vec![(0.0, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
-        vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
+        vel_range: vec![
+            (f64::MIN, f64::MAX),
+            (f64::MIN, f64::MAX),
+            (f64::MIN, f64::MAX),
+        ],
     });
     sim.insert_resource(WriteOnce(true));
     sim.insert_resource(Interval(10));
@@ -42,15 +49,30 @@ fn main() {
     let length = 1000e-6;
 
     sim.world_mut()
-        .spawn(WallData{
-            wall_type: WallType::Rough})
-        .insert(CylindricalPipe::new(radius, length, Vector3::new(1.0, 0.0, 0.0)))
-        .insert(Position{pos: Vector3::new(-length / 2.0, 0.0, 0.0)});
+        .spawn(WallData {
+            wall_type: WallType::Rough,
+        })
+        .insert(CylindricalPipe::new(
+            radius,
+            length,
+            Vector3::new(1.0, 0.0, 0.0),
+        ))
+        .insert(Position {
+            pos: Vector3::new(-length / 2.0, 0.0, 0.0),
+        });
 
     sim.world_mut()
-        .spawn(SimulationVolume{volume_type: VolumeType::Inclusive})
-        .insert(MyCylinder::new(1500e-6, 2000e-6, Vector3::new(1.0, 0.0, 0.0)))
-        .insert(Position{pos: Vector3::new(000e-6, 0.0, 0.0)});
+        .spawn(SimulationVolume {
+            volume_type: VolumeType::Inclusive,
+        })
+        .insert(MyCylinder::new(
+            1500e-6,
+            2000e-6,
+            Vector3::new(1.0, 0.0, 0.0),
+        ))
+        .insert(Position {
+            pos: Vector3::new(000e-6, 0.0, 0.0),
+        });
 
     let number_to_emit = 1e10;
 
@@ -70,25 +92,31 @@ fn main() {
     sim.world_mut()
         .spawn(Oven::<Strontium88> {
             temperature: 700.0,
-            aperture: OvenAperture::Circular{radius, thickness: 1e-9},
+            aperture: OvenAperture::Circular {
+                radius,
+                thickness: 1e-9,
+            },
             direction: Vector3::new(1.0, 0.0, 0.0),
             theta_distribution: uniform_distribution,
-            max_theta: PI/2.0,
+            max_theta: PI / 2.0,
             phantom: PhantomData,
         })
         .insert(Position {
-            pos: Vector3::new(- length * 0.99999, 0.0, 0.0),
+            pos: Vector3::new(-length * 0.99999, 0.0, 0.0),
         })
         .insert(MassDistribution::new(vec![MassRatio {
             mass: 88.0,
             ratio: 1.0,
         }]))
-        .insert(AtomNumberToEmit{number: 0})
-        .insert(EmitFixedRate{rate: number_to_emit});
+        .insert(AtomNumberToEmit { number: 0 })
+        .insert(EmitFixedRate {
+            rate: number_to_emit,
+        });
 
     // Define timestep
     sim.world_mut().insert_resource(Timestep { delta: 1e-7 });
-    sim.world_mut().insert_resource(VelocityCap {value: f64::MAX});
+    sim.world_mut()
+        .insert_resource(VelocityCap { value: f64::MAX });
 
     // Run the simulation for a number of steps.
     for _i in 0..5_000 {

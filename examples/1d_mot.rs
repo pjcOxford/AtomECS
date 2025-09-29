@@ -4,29 +4,34 @@
 
 extern crate atomecs as lib;
 extern crate nalgebra;
+use bevy::prelude::*;
 use lib::atom::{Atom, Force, Mass, Position, Velocity};
 use lib::initiate::NewlyCreated;
 use lib::integrator::Timestep;
-use lib::laser::LaserPlugin;
 use lib::laser::gaussian::GaussianBeam;
+use lib::laser::LaserPlugin;
 use lib::laser_cooling::{CoolingLight, LaserCoolingPlugin};
 use lib::magnetic::quadrupole::QuadrupoleField3D;
-use lib::output::file::{FileOutputPlugin};
+use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
 use lib::simulation::SimulationBuilder;
-use lib::species::{Strontium88_461};
+use lib::species::Strontium88_461;
 use nalgebra::Vector3;
-use bevy::prelude::*;
 
-const BEAM_NUMBER : usize = 6;
+const BEAM_NUMBER: usize = 6;
 
 fn main() {
-
     let mut sim_builder = SimulationBuilder::default();
-    sim_builder.add_plugins(LaserPlugin::<{BEAM_NUMBER}>);
-    sim_builder.add_plugins(LaserCoolingPlugin::<Strontium88_461, {BEAM_NUMBER}>::default());
-    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(), 10));
-    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(), 10));
+    sim_builder.add_plugins(LaserPlugin::<{ BEAM_NUMBER }>);
+    sim_builder.add_plugins(LaserCoolingPlugin::<Strontium88_461, { BEAM_NUMBER }>::default());
+    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new(
+        "pos.txt".to_string(),
+        10,
+    ));
+    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new(
+        "vel.txt".to_string(),
+        10,
+    ));
     let mut sim = sim_builder.build();
 
     // Create magnetic field.
@@ -35,7 +40,6 @@ fn main() {
         .insert(Position {
             pos: Vector3::new(0.0, 0.0, 0.0),
         });
-
 
     // Create cooling lasers.
     let detuning = -12.0;
@@ -69,7 +73,7 @@ fn main() {
     for i in 0..20 {
         sim.world_mut()
             .spawn(Position {
-                pos: Vector3::new(0.0,0.0, -0.05),
+                pos: Vector3::new(0.0, 0.0, -0.05),
             })
             .insert(Velocity {
                 vel: Vector3::new(0.0, 0.0, 10.0 + (i as f64) * 5.0),

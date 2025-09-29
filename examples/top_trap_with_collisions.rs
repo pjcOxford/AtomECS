@@ -2,13 +2,14 @@
 
 extern crate atomecs as lib;
 extern crate nalgebra;
+use bevy::prelude::*;
 use lib::atom::{Atom, Force, Mass, Position, Velocity};
-use lib::collisions::CollisionPlugin;
 use lib::collisions::atom_collisions::{CollisionParameters, CollisionsTracker, CrossSection};
+use lib::collisions::CollisionPlugin;
 use lib::collisions::{ApplyAtomCollisions, ApplyWallCollisions};
 use lib::initiate::NewlyCreated;
 use lib::integrator::Timestep;
-use lib::magnetic::force::{MagneticDipole};
+use lib::magnetic::force::MagneticDipole;
 use lib::magnetic::quadrupole::QuadrupoleField3D;
 use lib::magnetic::top::UniformFieldRotator;
 use lib::magnetic::uniform::UniformMagneticField;
@@ -17,7 +18,6 @@ use lib::output::file::Text;
 use lib::simulation::SimulationBuilder;
 use nalgebra::Vector3;
 use rand_distr::{Distribution, Normal};
-use bevy::prelude::*;
 use std::fs::File;
 use std::io::{Error, Write};
 use std::time::Instant;
@@ -25,8 +25,14 @@ use std::time::Instant;
 fn main() {
     let now = Instant::now();
     let mut sim_builder = SimulationBuilder::default();
-    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(),100));
-    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(),100));
+    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new(
+        "pos.txt".to_string(),
+        100,
+    ));
+    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new(
+        "vel.txt".to_string(),
+        100,
+    ));
     sim_builder.add_plugins(CollisionPlugin);
 
     let mut sim = sim_builder.build();
@@ -37,11 +43,13 @@ fn main() {
         .insert(Position::default());
 
     sim.world_mut()
-        .spawn(UniformFieldRotator{
+        .spawn(UniformFieldRotator {
             amplitude: 2e-3,
             frequency: 3000.0,
         })
-        .insert(UniformMagneticField {field: Vector3::new(0.0, 0.0, 0.0)})
+        .insert(UniformMagneticField {
+            field: Vector3::new(0.0, 0.0, 0.0),
+        })
         .insert(Position::default()); // Time averaged TOP theory assumes rotation frequency much greater than velocity of atoms
 
     let p_dist = Normal::new(0.0, 50e-6).unwrap();
@@ -80,7 +88,8 @@ fn main() {
         collision_limit: 10_000_000.0, //Maximum number of collisions that can be calculated in one frame.
                                        //This avoids absurdly high collision numbers if many atoms are initialised with the same position, for example.
     });
-    sim.world_mut().insert_resource(CrossSection { sigma: 3.5e-16 });
+    sim.world_mut()
+        .insert_resource(CrossSection { sigma: 3.5e-16 });
     sim.world_mut().insert_resource(CollisionsTracker {
         num_collisions: Vec::new(),
         num_atoms: Vec::new(),
@@ -89,7 +98,7 @@ fn main() {
 
     // Define timestep
     sim.world_mut().insert_resource(Timestep { delta: 5e-5 }); //Aliasing of TOP field or other strange effects can occur if timestep is not much smaller than TOP field period.
-                                                //Timestep must also be much smaller than mean collision time.
+                                                               //Timestep must also be much smaller than mean collision time.
 
     let mut filename = File::create("collisions.txt").expect("Cannot create file.");
 
@@ -134,4 +143,3 @@ fn write_collisions_tracker(
     )?;
     Ok(())
 }
-

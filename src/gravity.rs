@@ -7,12 +7,10 @@ use bevy::prelude::*;
 use nalgebra::Vector3;
 
 /// A resource that indicates that the simulation should apply the force of gravity.
-#[derive(Resource)]
-#[derive(Default)]
+#[derive(Resource, Default)]
 pub struct GravityConfiguration {
     pub apply_gravity: bool,
 }
-
 
 fn apply_gravitational_forces(
     batch_strategy: Res<AtomECSBatchStrategy>,
@@ -36,7 +34,8 @@ fn apply_gravitational_forces(
 pub struct GravityPlugin;
 impl Plugin for GravityPlugin {
     fn build(&self, app: &mut App) {
-        app.world_mut().insert_resource(GravityConfiguration::default());
+        app.world_mut()
+            .insert_resource(GravityConfiguration::default());
         app.add_systems(Update, apply_gravitational_forces);
     }
 }

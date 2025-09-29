@@ -1,8 +1,8 @@
 //! Gaussian beam intensity distribution
 
 use crate::laser::frame::Frame;
-use nalgebra::Vector3;
 use bevy::prelude::*;
+use nalgebra::Vector3;
 
 use crate::atom::Position;
 use crate::constant::EXP;
@@ -145,7 +145,7 @@ impl GaussianBeam {
 /// A component that covers the central portion of a laser beam.
 ///
 /// The mask is assumed to be coaxial to the [GaussianBeam].
-/// 
+///
 /// Not currently supported for gradients.
 #[derive(Clone, Copy, Component)]
 #[component(storage = "SparseSet")]

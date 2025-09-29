@@ -29,11 +29,11 @@ pub trait AtomicTransition {
 }
 
 /// A transition which can be used as a component.
-pub trait TransitionComponent : AtomicTransition + Component + Send + Sync + Default + Copy {}
+pub trait TransitionComponent: AtomicTransition + Component + Send + Sync + Default + Copy {}
 impl<T: AtomicTransition + Component + Send + Sync + Default + Copy> TransitionComponent for T {}
 
 /// Generates a laser-cooling transition.
-/// 
+///
 /// # Arguments:
 /// * `transition_name`: name of the generated struct.
 /// * `frequency`: frequency of the laser cooling transition, in Hz.
@@ -61,28 +61,46 @@ macro_rules! transition {
         pub struct $transition_name;
         impl $crate::laser_cooling::transition::AtomicTransition for $transition_name {
             /// Frequency of the laser cooling transition, Hz.
-            fn frequency() -> f64 { $frequency }
+            fn frequency() -> f64 {
+                $frequency
+            }
             /// Linewidth of the laser cooling transition, Hz.
-            fn linewidth() -> f64 { $linewidth }
+            fn linewidth() -> f64 {
+                $linewidth
+            }
             /// Wavelength of the laser cooling transition, m.
-            fn wavelength() -> f64 { $crate::constant::C / $frequency }
+            fn wavelength() -> f64 {
+                $crate::constant::C / $frequency
+            }
             /// The dependence of the sigma_+ transition on magnetic fields.
             /// The sigma_+ transition is shifted by `mup * field.magnitude / h` Hz.
             /// The units of mup are of Energy per magnetic field, ie Joules/Tesla.
-            fn mup() -> f64 { $mup }
+            fn mup() -> f64 {
+                $mup
+            }
             /// The dependence of the sigma_- transition on magnetic fields.
             /// The sigma_- transition is shifted by `mum * field.magnitude / h` Hz.
             /// The units of mup are of Energy per magnetic field, ie Joules/Tesla.
-            fn mum() -> f64 { $mum }
+            fn mum() -> f64 {
+                $mum
+            }
             /// The dependence of the sigma_pi transition on magnetic fields.
             /// The sigma_pi transition is shifted by `muz * field.magnitude / h` Hz.
             /// The units of mup are of Energy per magnetic field, ie Joules/Tesla.
-            fn muz() -> f64 { $muz }
+            fn muz() -> f64 {
+                $muz
+            }
             /// Saturation intensity, in units of W/m^2.
-            fn saturation_intensity() -> f64 { $saturation_intensity }
+            fn saturation_intensity() -> f64 {
+                $saturation_intensity
+            }
             /// Precalculate prefactor used in the determination of rate coefficients.
-            fn rate_prefactor() -> f64 { ($linewidth * 2.0 * std::f64::consts::PI).powi(3) / ($saturation_intensity * 8.0) }
-            fn gamma() -> f64 { $linewidth * 2.0 * std::f64::consts::PI }
+            fn rate_prefactor() -> f64 {
+                ($linewidth * 2.0 * std::f64::consts::PI).powi(3) / ($saturation_intensity * 8.0)
+            }
+            fn gamma() -> f64 {
+                $linewidth * 2.0 * std::f64::consts::PI
+            }
         }
     };
 }

@@ -96,7 +96,7 @@ fn clear_force(mut query: Query<&mut Force>, batch_strategy: Res<AtomECSBatchStr
         .for_each(|mut force| {
             force.force = Vector3::new(0.0, 0.0, 0.0);
         });
-    }
+}
 
 /// Stores the value of the force calculation from the previous frame.
 #[derive(Component, Default)]
@@ -112,25 +112,32 @@ pub enum IntegrationSet {
 pub struct IntegrationPlugin;
 impl Plugin for IntegrationPlugin {
     fn build(&self, app: &mut App) {
-        app.world_mut().insert_resource(AtomECSBatchStrategy::default());
+        app.world_mut()
+            .insert_resource(AtomECSBatchStrategy::default());
         app.world_mut().insert_resource(Step::default());
         app.world_mut().insert_resource(Timestep::default());
         // By default, systems are added to CoreSet::Update. We want our integrator to sandwich either side of these.
 
-        app.configure_sets(PreUpdate,
-            IntegrationSet::BeginIntegration,
+        app.configure_sets(PreUpdate, IntegrationSet::BeginIntegration);
+        app.configure_sets(PostUpdate, IntegrationSet::EndIntegration);
+        app.add_systems(
+            PreUpdate,
+            velocity_verlet_integrate_position.in_set(IntegrationSet::BeginIntegration),
         );
-        app.configure_sets(PostUpdate,
-            IntegrationSet::EndIntegration,
-        );
-        app.add_systems(PreUpdate, velocity_verlet_integrate_position.in_set(IntegrationSet::BeginIntegration));
-        app.add_systems(PreUpdate, 
+        app.add_systems(
+            PreUpdate,
             clear_force
                 .in_set(IntegrationSet::BeginIntegration)
                 .after(velocity_verlet_integrate_position),
         );
-        app.add_systems(PreUpdate, add_old_force_to_new_atoms.in_set(IntegrationSet::BeginIntegration));
-        app.add_systems(PostUpdate, velocity_verlet_integrate_velocity.in_set(IntegrationSet::EndIntegration));
+        app.add_systems(
+            PreUpdate,
+            add_old_force_to_new_atoms.in_set(IntegrationSet::BeginIntegration),
+        );
+        app.add_systems(
+            PostUpdate,
+            velocity_verlet_integrate_velocity.in_set(IntegrationSet::EndIntegration),
+        );
     }
 }
 
@@ -182,9 +189,7 @@ mod tests {
             })
             .insert(Force { force })
             .insert(OldForce(Force { force }))
-            .insert(Mass {
-                value: mass / AMU,
-            })
+            .insert(Mass { value: mass / AMU })
             .id();
 
         let dt = 1.0e-3;

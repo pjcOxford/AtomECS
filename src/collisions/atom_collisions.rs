@@ -8,19 +8,19 @@
 //! We assume the atoms within a cell have an approximately thermal distribution in order to relate average velocity to average relative velocity.
 //! For cases where this approximation is poor, the collision rate may be wrong.
 //! We assume a single species of atom, with a constant (not velocity dependent) collisional cross-section.
-//! We cannot have too few particles per box: the current implementation allows the same number of particles to collide multiple times, 
+//! We cannot have too few particles per box: the current implementation allows the same number of particles to collide multiple times,
 //! the effect of which is exacerbated in cells with few particles.
 //!
 //!
 
+use crate::atom::{Atom, Position, Velocity};
+use crate::collisions::spatial_grid::BoxID;
+use crate::constant::PI;
+use crate::integrator::Timestep;
+use bevy::prelude::*;
 use hashbrown::HashMap;
 use nalgebra::Vector3;
 use rand::Rng;
-use bevy::prelude::*;
-use crate::atom::{Position, Velocity, Atom};
-use crate::constant::PI;
-use crate::integrator::Timestep;
-use crate::collisions::spatial_grid::BoxID;
 
 /// A patition of space within which collisions can occur
 pub struct CollisionBox {
@@ -66,12 +66,12 @@ impl CollisionBox {
             return;
         }
 
-        // find the max speed in the box to use the No Time Counter method 
-        let mut max_speed = self.entity_velocities
+        // find the max speed in the box to use the No Time Counter method
+        let mut max_speed = self
+            .entity_velocities
             .iter()
             .map(|(_, velocity)| velocity.norm())
             .fold(0.0, f64::max);
-    
 
         // number of times we check for collisions is N*n*sigma*v*dt, where n is atom density and N is atom number
         // probability of any given pair of particles colliding is sigma*vrel/(sigma*vrel)_max, sigma cross section and vrel the relative speed
@@ -97,18 +97,22 @@ impl CollisionBox {
                 let idx1 = rng.random_range(0..self.entity_velocities.len());
                 let mut idx2 = rng.random_range(0..self.entity_velocities.len() - 1);
                 if idx2 >= idx1 {
-                    idx2 = idx2 + 1;
+                    idx2 += 1;
                 }
 
                 let v1 = self.entity_velocities[idx1].1;
                 let v2 = self.entity_velocities[idx2].1;
                 let vel_rel = (v1 - v2).norm();
                 if vel_rel > 2.0 * max_speed {
-                    println!("!");
-                    num_checks_left += (self.particle_number as f64 - 1.0) * density * sigma * (vel_rel - 2.0 * max_speed) * dt / 2.0 ;
+                    num_checks_left += (self.particle_number as f64 - 1.0)
+                        * density
+                        * sigma
+                        * (vel_rel - 2.0 * max_speed)
+                        * dt
+                        / 2.0;
                     max_speed = vel_rel / 2.0;
                 }
-                let prob_collision =  vel_rel / (2.0 * max_speed);
+                let prob_collision = vel_rel / (2.0 * max_speed);
                 let collide = rng.random_bool(prob_collision);
                 if collide {
                     let (v1new, v2new) = do_collision(v1, v2);
@@ -163,8 +167,10 @@ pub fn apply_collisions_system(
         if boxid.id == i64::MAX {
             continue;
         } else {
-            map.entry(boxid.id).or_default()
-                .entity_velocities.push((entity, velocity.vel));
+            map.entry(boxid.id)
+                .or_default()
+                .entity_velocities
+                .push((entity, velocity.vel));
         }
     }
 
@@ -199,7 +205,6 @@ pub fn apply_collisions_system(
         .collect();
 }
 
-
 fn do_collision(mut v1: Vector3<f64>, mut v2: Vector3<f64>) -> (Vector3<f64>, Vector3<f64>) {
     let mut rng = rand::rng();
 
@@ -226,11 +231,11 @@ fn do_collision(mut v1: Vector3<f64>, mut v2: Vector3<f64>) -> (Vector3<f64>, Ve
 mod tests {
     use super::*;
     use crate::atom::{Atom, Force, Mass, Position, Velocity};
+    use crate::collisions::CollisionPlugin;
     use crate::initiate::NewlyCreated;
     use crate::integrator::Timestep;
-    use crate::collisions::CollisionPlugin;
-    use nalgebra::Vector3;
     use crate::simulation::SimulationBuilder;
+    use nalgebra::Vector3;
 
     #[test]
     fn test_do_collision() {
@@ -258,7 +263,6 @@ mod tests {
     /// This will fail sometimes
     #[test]
     fn test_collision_rate() {
-        use assert_approx_eq::assert_approx_eq;
         let mut rng = rand::rng();
         let params = CollisionParameters {
             macroparticle: 2.0,
@@ -267,16 +271,16 @@ mod tests {
             collision_limit: 1_000_000.0,
         };
         const MACRO_ATOM_NUMBER: usize = 100_000;
+        const NUM_TESTS: usize = 1000;
         let dt = 1e-3;
-        let mut expected_collision = 0.0;
         let sigma = 1e-10;
+        let mut expected_collision = 0.0;
         let mut actual_collision = 0.0;
-        for _i in 0..100 {
-            let x1 = rng.random::<f64>();
-            let x2 = rng.random::<f64>();
-            let v1 = Vector3::new(x1 * 2.0, 0.0, 0.0);
-            let v2 = Vector3::new(x2 * 2.0, 0.0, 0.0);
-            
+        let mut failure = 0;
+        for _i in 0..NUM_TESTS {
+            let v1 = Vector3::new(rng.random::<f64>() * 2.0, 0.0, 0.0);
+            let v2 = Vector3::new(rng.random::<f64>() * 2.0, 0.0, 0.0);
+
             // Create dummy entities for testing
             let mut entity_velocities: Vec<(Entity, Vector3<f64>)> = Vec::new();
             for _i in 0..MACRO_ATOM_NUMBER {
@@ -285,26 +289,43 @@ mod tests {
                 let entity = Entity::PLACEHOLDER;
                 entity_velocities.push((entity, v2));
             }
-            
+
             let mut collision_box = CollisionBox {
                 entity_velocities,
                 ..Default::default()
             };
-            collision_box.do_collisions(params, dt, sigma);
+            collision_box.do_collisions(params, sigma, dt);
             let atom_number = params.macroparticle * 2.0 * MACRO_ATOM_NUMBER as f64;
             let density = atom_number / params.box_width.powi(3);
-            let expected_number = (collision_box.particle_number as f64 - 1.0) * density * sigma * (v1 - v2).norm() * dt / 4.0;
+            let expected_number = (collision_box.particle_number as f64 - 1.0)
+                * density
+                * sigma
+                * (v1 - v2).norm()
+                * dt
+                / 4.0;
             expected_collision += expected_number;
             actual_collision += collision_box.collision_number as f64;
             assert_eq!(collision_box.particle_number, 2 * MACRO_ATOM_NUMBER as i32);
             assert_eq!(collision_box.atom_number, atom_number);
-            assert_approx_eq!(collision_box.collision_number as f64, expected_number, expected_number * 0.20);
+            if (collision_box.collision_number as f64 - expected_number).abs()
+                > expected_number * 0.10
+            {
+                failure += 1;
+            }
         }
-        let delta = (expected_collision - actual_collision).abs()/expected_collision;
+        let delta = (expected_collision - actual_collision).abs() / expected_collision;
+        println!("Failed {} out of 1000 tests", failure);
+        println!(
+            "Expected collisions: {}, actual collisions: {}",
+            expected_collision, actual_collision
+        );
+        println!("{}", delta);
+        if failure as f64 > NUM_TESTS as f64 / 20.0 {
+            panic!()
+        }
         if delta > 0.05 {
             panic!()
         }
-        println!("{}", delta);
     }
 
     /// Test that the system runs and causes nearby atoms to collide. More of an integration test than a unit test.
@@ -356,16 +377,33 @@ mod tests {
             box_width: 2.0,
             collision_limit: 10_000.0,
         });
-        sim.world_mut().insert_resource(CrossSection { sigma: 10.0 });
+        sim.world_mut()
+            .insert_resource(CrossSection { sigma: 10.0 });
         for _i in 0..10 {
             sim.update();
         }
 
-        let vel1new = sim.world().entity(atom1).get::<Velocity>().expect("atom1 not found");
-        let vel2new = sim.world().entity(atom2).get::<Velocity>().expect("atom2 not found");
+        let vel1new = sim
+            .world()
+            .entity(atom1)
+            .get::<Velocity>()
+            .expect("atom1 not found");
+        let vel2new = sim
+            .world()
+            .entity(atom2)
+            .get::<Velocity>()
+            .expect("atom2 not found");
 
-        let pos1new = sim.world().entity(atom1).get::<Position>().expect("atom1 not found");
-        let pos2new = sim.world().entity(atom2).get::<Position>().expect("atom2 not found");
+        let pos1new = sim
+            .world()
+            .entity(atom1)
+            .get::<Position>()
+            .expect("atom1 not found");
+        let pos2new = sim
+            .world()
+            .entity(atom2)
+            .get::<Position>()
+            .expect("atom2 not found");
 
         assert_ne!(pos1, pos1new.pos);
         assert_ne!(pos2, pos2new.pos);

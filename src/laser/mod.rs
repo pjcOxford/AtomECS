@@ -47,7 +47,8 @@ pub struct RequiresIntensityGradientCalculation;
 pub struct LaserPlugin<const N: usize>;
 impl<const N: usize> Plugin for LaserPlugin<N> {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update,
+        app.add_systems(
+            Update,
             (
                 attach_laser_components_to_newly_created_atoms::<N>,
                 index::index_lasers

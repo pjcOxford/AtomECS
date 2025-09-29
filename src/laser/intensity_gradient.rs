@@ -107,7 +107,10 @@ pub mod tests {
             })
             .id();
 
-        app.add_systems(Update, sample_gaussian_laser_intensity_gradient::<1, TestComp>);
+        app.add_systems(
+            Update,
+            sample_gaussian_laser_intensity_gradient::<1, TestComp>,
+        );
         app.update();
 
         let sim_result_gradient = app
@@ -185,7 +188,10 @@ pub mod tests {
             })
             .id();
 
-        app.add_systems(Update, sample_gaussian_laser_intensity_gradient::<1, TestComp>);
+        app.add_systems(
+            Update,
+            sample_gaussian_laser_intensity_gradient::<1, TestComp>,
+        );
         app.update();
 
         let sim_result_gradient = app

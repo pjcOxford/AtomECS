@@ -139,7 +139,8 @@ impl Plugin for MagneticsPlugin {
     fn build(&self, app: &mut App) {
         //add_magnetics_systems_to_dispatch(&mut builder.dispatcher_builder, &[]);
 
-        app.add_systems(Update,
+        app.add_systems(
+            Update,
             (
                 clear_magnetic_field_sampler.before(MagneticSystemsSet::SampleFields),
                 analytic::calculate_field_contributions::<quadrupole::QuadrupoleField3D>

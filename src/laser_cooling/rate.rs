@@ -186,7 +186,10 @@ pub mod tests {
             })
             .id();
 
-        app.add_systems(Update, calculate_rate_coefficients::<LASER_COUNT, Strontium88_461>);
+        app.add_systems(
+            Update,
+            calculate_rate_coefficients::<LASER_COUNT, Strontium88_461>,
+        );
         app.update();
 
         let man_pref = Strontium88_461::rate_prefactor() * intensity;

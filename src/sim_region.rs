@@ -138,7 +138,8 @@ pub enum SimRegionSet {
 pub struct SimulationRegionPlugin;
 impl Plugin for SimulationRegionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, 
+        app.add_systems(
+            Update,
             (
                 clear_region_tests.before(SimRegionSet::RegionTestVolume),
                 perform_region_tests::<Sphere>.in_set(SimRegionSet::RegionTestVolume),
@@ -157,6 +158,7 @@ impl Plugin for SimulationRegionPlugin {
 pub mod tests {
     use super::*;
     use crate::atom::Position;
+    use crate::shapes::{Cuboid, Sphere};
     use nalgebra::Vector3;
 
     #[test]

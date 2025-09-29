@@ -125,7 +125,10 @@ pub mod tests {
             .insert(TwoLevelPopulation::<Strontium88_461>::default())
             .id();
 
-        app.add_systems(Update, calculate_two_level_population::<LASER_COUNT, Strontium88_461>);
+        app.add_systems(
+            Update,
+            calculate_two_level_population::<LASER_COUNT, Strontium88_461>,
+        );
         app.update();
 
         let mut sum_rates = 0.0;
@@ -171,7 +174,10 @@ pub mod tests {
             .insert(TwoLevelPopulation::<Strontium88_461>::default())
             .id();
 
-        app.add_systems(Update, calculate_two_level_population::<LASER_COUNT, Strontium88_461>);
+        app.add_systems(
+            Update,
+            calculate_two_level_population::<LASER_COUNT, Strontium88_461>,
+        );
         app.update();
 
         assert_approx_eq!(

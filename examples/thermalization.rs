@@ -1,28 +1,34 @@
 extern crate atomecs as lib;
 extern crate nalgebra;
-use nalgebra::Vector3;
-use rand_distr::{Distribution, Uniform};
 use bevy::prelude::*;
 use lib::atom::{Atom, Force, Mass, Position, Velocity};
+use lib::collisions::atom_collisions::{CollisionParameters, CollisionsTracker, CrossSection};
+use lib::collisions::wall_collisions::{WallData, WallType};
+use lib::collisions::CollisionPlugin;
 use lib::initiate::NewlyCreated;
 use lib::integrator::Timestep;
 use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
+use lib::shapes::Sphere as MySphere;
+use lib::sim_region::{SimulationVolume, VolumeType};
 use lib::simulation::SimulationBuilder;
+use nalgebra::Vector3;
+use rand_distr::{Distribution, Uniform};
 use std::fs::File;
 use std::io::{Error, Write};
 use std::time::Instant;
-use lib::shapes::Sphere as MySphere;
-use lib::collisions::wall_collisions::{WallData, WallType};
-use lib::collisions::CollisionPlugin;
-use lib::collisions::atom_collisions::{CollisionParameters, CollisionsTracker, CrossSection};
-use lib::sim_region::{SimulationVolume, VolumeType};
 
 fn main() {
     let now = Instant::now();
     let mut sim_builder = SimulationBuilder::default();
-    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new("pos.txt".to_string(),150));
-    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(),150));
+    sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new(
+        "pos.txt".to_string(),
+        150,
+    ));
+    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new(
+        "vel.txt".to_string(),
+        150,
+    ));
     sim_builder.add_plugins(CollisionPlugin);
 
     let mut sim = sim_builder.build();
@@ -45,7 +51,8 @@ fn main() {
                     v_dist.sample(&mut rand::rng()),
                     v_dist.sample(&mut rand::rng()),
                     v_dist.sample(&mut rand::rng()),
-                ).normalize(),
+                )
+                .normalize(),
             })
             .insert(NewlyCreated)
             .insert(Mass { value: 87.0 });
@@ -59,7 +66,8 @@ fn main() {
         collision_limit: 10_000_000.0, //Maximum number of collisions that can be calculated in one frame.
                                        //This avoids absurdly high collision numbers if many atoms are initialised with the same position, for example.
     });
-    sim.world_mut().insert_resource(CrossSection { sigma: 3.5e-16 }); 
+    sim.world_mut()
+        .insert_resource(CrossSection { sigma: 3.5e-16 });
     sim.world_mut().insert_resource(CollisionsTracker {
         num_collisions: Vec::new(),
         num_atoms: Vec::new(),
@@ -67,18 +75,19 @@ fn main() {
     });
 
     sim.world_mut()
-        .spawn(WallData{
-            wall_type: WallType::Rough})
-        .insert(MySphere{radius: 5e-2})
-        .insert(Position{pos: Vector3::new(0.0, 0.0, 0.0)});
+        .spawn(WallData {
+            wall_type: WallType::Rough,
+        })
+        .insert(MySphere { radius: 5e-2 })
+        .insert(Position {
+            pos: Vector3::new(0.0, 0.0, 0.0),
+        });
 
     sim.world_mut()
         .spawn(Position {
             pos: Vector3::new(0.0, 0.0, 0.0),
         })
-        .insert(MySphere {
-            radius: 502e-4, 
-        })
+        .insert(MySphere { radius: 502e-4 })
         .insert(SimulationVolume {
             volume_type: VolumeType::Inclusive,
         });
@@ -129,4 +138,3 @@ fn write_collisions_tracker(
     )?;
     Ok(())
 }
-

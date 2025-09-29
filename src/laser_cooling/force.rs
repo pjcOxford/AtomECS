@@ -203,7 +203,10 @@ pub mod tests {
             .insert(Force::default())
             .id();
 
-        app.add_systems(Update, calculate_absorption_forces::<LASER_COUNT, Strontium88_461>);
+        app.add_systems(
+            Update,
+            calculate_absorption_forces::<LASER_COUNT, Strontium88_461>,
+        );
         app.update();
 
         let actual_force_x = number_scattered * HBAR * 2. * PI / wavelength / time_delta;
@@ -239,7 +242,10 @@ pub mod tests {
             .insert(Strontium88_461)
             .id();
 
-        app.add_systems(Update, calculate_emission_forces::<LASER_COUNT, Strontium88_461>);
+        app.add_systems(
+            Update,
+            calculate_emission_forces::<LASER_COUNT, Strontium88_461>,
+        );
         app.update();
 
         let max_force_total =

@@ -5,8 +5,8 @@ use super::WeightedProbabilityDistribution;
 use crate::constant::{AMU, BOLTZCONST, EXP};
 
 use rand;
-use rand::distr::Distribution;
 use rand::distr::weighted::WeightedIndex;
+use rand::distr::Distribution;
 use rand::Rng;
 
 use bevy::prelude::*;
@@ -109,7 +109,6 @@ impl PrecalculatedSpeciesInformation {
     }
 }
 
-
 pub trait MaxwellBoltzmannSource {
     fn get_temperature(&self) -> f64;
     fn get_v_dist_power(&self) -> f64;
@@ -133,12 +132,13 @@ pub fn precalculate_for_species_system<T>(
             mass_distribution,
             source.get_v_dist_power(),
         );
-        
+
         // Remove MassDistribution and add PrecalculatedSpeciesInformation
-        commands.entity(entity)
+        commands
+            .entity(entity)
             .remove::<MassDistribution>()
             .insert(precalculated);
-            
+
         println!("Precalculated velocity and mass distributions for a species.");
     }
 }

@@ -126,9 +126,16 @@ pub mod tests {
     fn test_attach_zeeman_sampler_to_newly_created_atoms() {
         let mut app = App::new();
         app.insert_resource(AtomECSBatchStrategy::default());
-        let atom = app.world_mut().spawn(NewlyCreated).insert(Strontium88_461).id();
+        let atom = app
+            .world_mut()
+            .spawn(NewlyCreated)
+            .insert(Strontium88_461)
+            .id();
 
-        app.add_systems(Update, attach_zeeman_shift_samplers_to_newly_created_atoms::<Strontium88_461>);
+        app.add_systems(
+            Update,
+            attach_zeeman_shift_samplers_to_newly_created_atoms::<Strontium88_461>,
+        );
         app.update();
 
         assert!(app

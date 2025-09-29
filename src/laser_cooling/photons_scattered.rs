@@ -291,7 +291,10 @@ pub mod tests {
             .insert(tlp)
             .id();
 
-        app.add_systems(Update, calculate_mean_total_photons_scattered::<Strontium88_461>);
+        app.add_systems(
+            Update,
+            calculate_mean_total_photons_scattered::<Strontium88_461>,
+        );
         app.update();
 
         let scattered = Strontium88_461::gamma() * 0.3 * time_delta;
@@ -332,7 +335,10 @@ pub mod tests {
             })
             .id();
 
-        app.add_systems(Update, calculate_expected_photons_scattered::<LASER_COUNT, Strontium88_461>);
+        app.add_systems(
+            Update,
+            calculate_expected_photons_scattered::<LASER_COUNT, Strontium88_461>,
+        );
         app.update();
 
         let scattered = 8.0 / LASER_COUNT as f64;

@@ -10,10 +10,10 @@ use lib::magnetic::quadrupole::QuadrupoleField3D;
 use lib::simulation::SimulationBuilder;
 use rand_distr::{Distribution, Normal};
 
+use bevy::prelude::*;
 use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
 use nalgebra::Vector3;
-use bevy::prelude::*;
 use std::time::Instant;
 
 fn main() {
@@ -32,8 +32,7 @@ fn main() {
     let mut sim = sim_builder.build();
 
     // Create magnetic field.
-    sim.world_mut()
-    .spawn((
+    sim.world_mut().spawn((
         QuadrupoleField3D::gauss_per_cm(65.0, Vector3::z()),
         Position {
             pos: Vector3::new(0.0, 0.0, 0.0),
@@ -44,28 +43,27 @@ fn main() {
     let v_dist = Normal::new(0.0, 0.09).unwrap(); //80uK
 
     for _i in 0..1000 {
-        sim.world_mut()
-            .spawn((
-                Position {
-                    pos: Vector3::new(
-                        p_dist.sample(&mut rand::rng()),
-                        p_dist.sample(&mut rand::rng()),
-                        p_dist.sample(&mut rand::rng()),
-                    ),
-                },
-                Atom,
-                Force::default(),
-                Velocity {
-                    vel: Vector3::new(
-                        v_dist.sample(&mut rand::rng()),
-                        v_dist.sample(&mut rand::rng()),
-                        v_dist.sample(&mut rand::rng()),
-                    ),
-                },
-                NewlyCreated,
-                MagneticDipole { mFgF: 0.5 },
-                Mass { value: 87.0 },
-            ));
+        sim.world_mut().spawn((
+            Position {
+                pos: Vector3::new(
+                    p_dist.sample(&mut rand::rng()),
+                    p_dist.sample(&mut rand::rng()),
+                    p_dist.sample(&mut rand::rng()),
+                ),
+            },
+            Atom,
+            Force::default(),
+            Velocity {
+                vel: Vector3::new(
+                    v_dist.sample(&mut rand::rng()),
+                    v_dist.sample(&mut rand::rng()),
+                    v_dist.sample(&mut rand::rng()),
+                ),
+            },
+            NewlyCreated,
+            MagneticDipole { mFgF: 0.5 },
+            Mass { value: 87.0 },
+        ));
     }
 
     // Define timestep

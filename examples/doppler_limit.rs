@@ -10,29 +10,29 @@
 
 extern crate atomecs as lib;
 extern crate nalgebra;
+use bevy::prelude::*;
 use lib::atom::{Atom, Force, Mass, Position, Velocity};
 use lib::initiate::NewlyCreated;
 use lib::integrator::Timestep;
-use lib::laser::LaserPlugin;
 use lib::laser::gaussian::GaussianBeam;
+use lib::laser::LaserPlugin;
 use lib::laser_cooling::force::{EmissionForceConfiguration, EmissionForceOption};
 use lib::laser_cooling::photons_scattered::ScatteringFluctuationsOption;
 use lib::laser_cooling::{CoolingLight, LaserCoolingPlugin};
 use lib::magnetic::quadrupole::QuadrupoleField3D;
-use lib::output::file::{FileOutputPlugin};
+use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
 use lib::simulation::SimulationBuilder;
-use lib::species::{Rubidium87_780D2};
+use lib::species::Rubidium87_780D2;
 use nalgebra::Vector3;
 use rand_distr::{Distribution, Normal};
-use bevy::prelude::*;
 use std::fs::read_to_string;
 use std::time::Instant;
 
 extern crate serde;
 use serde::Deserialize;
 
-const BEAM_NUMBER : usize = 6;
+const BEAM_NUMBER: usize = 6;
 
 #[derive(Deserialize)]
 pub struct DopperSimulationConfiguration {
@@ -62,9 +62,12 @@ fn main() {
 
     // Create the simulation
     let mut sim_builder = SimulationBuilder::default();
-    sim_builder.add_plugins(LaserPlugin::<{BEAM_NUMBER}>);
-    sim_builder.add_plugins(LaserCoolingPlugin::<Rubidium87_780D2, {BEAM_NUMBER}>::default());
-    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new("vel.txt".to_string(), 10));
+    sim_builder.add_plugins(LaserPlugin::<{ BEAM_NUMBER }>);
+    sim_builder.add_plugins(LaserCoolingPlugin::<Rubidium87_780D2, { BEAM_NUMBER }>::default());
+    sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new(
+        "vel.txt".to_string(),
+        10,
+    ));
     let mut sim = sim_builder.build();
 
     // Create magnetic field.
@@ -90,8 +93,7 @@ fn main() {
             ellipticity: 0.0,
         })
         .insert(CoolingLight::for_transition::<Rubidium87_780D2>(
-            detuning,
-            -1,
+            detuning, -1,
         ));
     sim.world_mut()
         .spawn(GaussianBeam {
@@ -103,8 +105,7 @@ fn main() {
             ellipticity: 0.0,
         })
         .insert(CoolingLight::for_transition::<Rubidium87_780D2>(
-            detuning,
-            -1,
+            detuning, -1,
         ));
     sim.world_mut()
         .spawn(GaussianBeam {
@@ -116,8 +117,7 @@ fn main() {
             ellipticity: 0.0,
         })
         .insert(CoolingLight::for_transition::<Rubidium87_780D2>(
-            detuning,
-            1,
+            detuning, 1,
         ));
     sim.world_mut()
         .spawn(GaussianBeam {
@@ -129,8 +129,7 @@ fn main() {
             ellipticity: 0.0,
         })
         .insert(CoolingLight::for_transition::<Rubidium87_780D2>(
-            detuning,
-            1,
+            detuning, 1,
         ));
     sim.world_mut()
         .spawn(GaussianBeam {
@@ -142,8 +141,7 @@ fn main() {
             ellipticity: 0.0,
         })
         .insert(CoolingLight::for_transition::<Rubidium87_780D2>(
-            detuning,
-            1,
+            detuning, 1,
         ));
     sim.world_mut()
         .spawn(GaussianBeam {
@@ -154,9 +152,8 @@ fn main() {
             rayleigh_range: f64::INFINITY,
             ellipticity: 0.0,
         })
-        .insert(CoolingLight::for_transition::<Rubidium87_780D2>(   
-            detuning,
-            1,
+        .insert(CoolingLight::for_transition::<Rubidium87_780D2>(
+            detuning, 1,
         ));
 
     // Define timestep
@@ -168,37 +165,38 @@ fn main() {
 
     // Add atoms
     for _ in 0..2000 {
-        sim.world_mut()
-            .spawn((
-                Position {
-                    pos: Vector3::new(
-                        pos_dist.sample(&mut rng),
-                        pos_dist.sample(&mut rng),
-                        pos_dist.sample(&mut rng),
-                    ),
-                },
-                Velocity {
-                    vel: Vector3::new(
-                        vel_dist.sample(&mut rng),
-                        vel_dist.sample(&mut rng),
-                        vel_dist.sample(&mut rng),
-                    ),
-                },
-                Force::default(),
-                Mass { value: 87.0 },
-                Rubidium87_780D2,
-                Atom,
-                NewlyCreated,
-            ));
+        sim.world_mut().spawn((
+            Position {
+                pos: Vector3::new(
+                    pos_dist.sample(&mut rng),
+                    pos_dist.sample(&mut rng),
+                    pos_dist.sample(&mut rng),
+                ),
+            },
+            Velocity {
+                vel: Vector3::new(
+                    vel_dist.sample(&mut rng),
+                    vel_dist.sample(&mut rng),
+                    vel_dist.sample(&mut rng),
+                ),
+            },
+            Force::default(),
+            Mass { value: 87.0 },
+            Rubidium87_780D2,
+            Atom,
+            NewlyCreated,
+        ));
     }
 
     // Enable fluctuation options
     //  * Allow photon numbers to fluctuate.
     //  * Allow random force from emission of photons.
-    sim.world_mut().insert_resource(EmissionForceOption::On(EmissionForceConfiguration {
-        explicit_threshold: 5,
-    }));
-    sim.world_mut().insert_resource(ScatteringFluctuationsOption::On);
+    sim.world_mut()
+        .insert_resource(EmissionForceOption::On(EmissionForceConfiguration {
+            explicit_threshold: 5,
+        }));
+    sim.world_mut()
+        .insert_resource(ScatteringFluctuationsOption::On);
 
     // Run the simulation for a number of steps.
     for _i in 0..configuration.number_of_steps {

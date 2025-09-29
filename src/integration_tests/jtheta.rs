@@ -1,24 +1,23 @@
-
 #[cfg(test)]
-mod tests{
-    use nalgebra::Vector3;
-    use bevy::prelude::*;
-    use std::marker::PhantomData;
-    use crate::constant::PI;
-    use crate::atom::{Atom, Position, Velocity};
-    use crate::integrator::Timestep;
-    use crate::simulation::SimulationBuilder;
-    use crate::sim_region::{SimulationVolume, VolumeType};
-    use crate::shapes::{Cylinder as MyCylinder, CylindricalPipe};
-    use crate::species::Strontium88;
-    use crate::atom_sources::{AtomSourcePlugin, WeightedProbabilityDistribution, VelocityCap};
-    use crate::atom_sources::emit::{EmitFixedRate, AtomNumberToEmit};
-    use crate::atom_sources::mass::{MassRatio, MassDistribution};
-    use crate::atom_sources::oven::{OvenAperture, Oven};
-    use crate::collisions::{CollisionPlugin, ApplyAtomCollisions, ApplyWallCollisions};
+mod tests {
+    use crate::atom::{Position, Velocity};
+    use crate::atom_sources::emit::{AtomNumberToEmit, EmitFixedRate};
+    use crate::atom_sources::mass::{MassDistribution, MassRatio};
+    use crate::atom_sources::oven::{Oven, OvenAperture};
+    use crate::atom_sources::{AtomSourcePlugin, VelocityCap, WeightedProbabilityDistribution};
     use crate::collisions::wall_collisions::{WallData, WallType};
-    use crate::marker::{MarkerConfig, WriteOrNot, Marker, WriteOnce, Interval};
+    use crate::collisions::{ApplyAtomCollisions, ApplyWallCollisions, CollisionPlugin};
+    use crate::constant::PI;
     use crate::integrator::Step;
+    use crate::integrator::Timestep;
+    use crate::marker::{Interval, Marker, MarkerConfig, WriteOnce, WriteOrNot};
+    use crate::shapes::{Cylinder as MyCylinder, CylindricalPipe};
+    use crate::sim_region::{SimulationVolume, VolumeType};
+    use crate::simulation::SimulationBuilder;
+    use crate::species::Strontium88;
+    use bevy::prelude::*;
+    use nalgebra::Vector3;
+    use std::marker::PhantomData;
 
     fn analytic_jtheta(theta: f64, channel_length: f64, channel_radius: f64) -> f64 {
         let beta = 2.0 * channel_radius / channel_length; // (4.16)
@@ -34,28 +33,35 @@ mod tests{
             let r_q = q.acos() - q * (1.0 - q.powf(2.0)).powf(0.5); // (4.23)
             j_theta = alpha * theta.cos()
                 + (2.0 / PI)
-                    * theta.cos() * ((1.0 - alpha) * r_q
-                    + 2.0 / (3.0 * q) * (1.0 - 2.0 * alpha) * (1.0 - (1.0 - q.powf(2.0)).powf(1.5)))
+                    * theta.cos()
+                    * ((1.0 - alpha) * r_q
+                        + 2.0 / (3.0 * q)
+                            * (1.0 - 2.0 * alpha)
+                            * (1.0 - (1.0 - q.powf(2.0)).powf(1.5)))
         // (4.21)
         } else {
-            j_theta = alpha * theta.cos() + 4.0 / (3.0 * PI * q) * (1.0 - 2.0 * alpha) * theta.cos();
+            j_theta =
+                alpha * theta.cos() + 4.0 / (3.0 * PI * q) * (1.0 - 2.0 * alpha) * theta.cos();
             // (4.22)
         }
         j_theta
     }
 
-    fn create_histogram_system(step: Res<Step>, mut query: Query<(&Velocity, &Marker)>, mut histogram: ResMut<Histogram>) {
+    fn create_histogram_system(
+        step: Res<Step>,
+        mut query: Query<(&Velocity, &Marker)>,
+        mut histogram: ResMut<Histogram>,
+    ) {
         if step.n % 5 != 0 {
             return;
         }
 
         for (vel, m) in query.iter_mut() {
-
-            if !(m.write_status == WriteOrNot::Write ){
+            if !(m.write_status == WriteOrNot::Write) {
                 continue;
             }
 
-            let theta = ((vel.vel[1].powi(2) + vel.vel[2].powi(2)).sqrt()/vel.vel[0]).atan();
+            let theta = ((vel.vel[1].powi(2) + vel.vel[2].powi(2)).sqrt() / vel.vel[0]).atan();
             if theta >= 0.0 && theta < PI / 2.0 {
                 let bin = (theta / (PI / 2.0) * 1000.0).floor() as usize;
                 histogram.bins[bin] += 1;
@@ -63,14 +69,19 @@ mod tests{
         }
     }
 
-    fn compare_histogram_to_analytic(histogram: &Histogram, channel_length: f64, channel_radius: f64) {
+    fn compare_histogram_to_analytic(
+        histogram: &Histogram,
+        channel_length: f64,
+        channel_radius: f64,
+    ) {
         let total_counts: i32 = histogram.bins.iter().sum();
         let mut analytic_values = Vec::<f64>::new();
         let mut hist_values = Vec::<f64>::new();
 
         for i in 0..histogram.bins.len() {
             let theta = (i as f64 + 0.5) * (PI / 2.0) / (histogram.bins.len() as f64 + 1.0);
-            analytic_values.push(analytic_jtheta(theta, channel_length, channel_radius) * theta.sin());
+            analytic_values
+                .push(analytic_jtheta(theta, channel_length, channel_radius) * theta.sin());
             hist_values.push(histogram.bins[i] as f64 / total_counts as f64);
         }
 
@@ -80,18 +91,16 @@ mod tests{
             *val /= analytic_sum;
         }
 
-        println!("Theta (rad), Analytic J(theta), Histogram J(theta)");
-        for i in 0..histogram.bins.len() {
-            let theta = (i as f64) * (PI / 2.0) / (histogram.bins.len() as f64);
-            println!("{:.5}, {:.5e}, {:.5e}", theta, analytic_values[i], hist_values[i]);
-        }
-
-        // Print comparison
-        let mean_square_error = analytic_values.iter().zip(hist_values.iter())
-            .map(|(a, h)| (((a - h).abs()) / a.abs()).powi(2) / (histogram.bins.len() as f64))
+        let mean_square_error = analytic_values
+            .iter()
+            .zip(hist_values.iter())
+            .map(|(a, h)| ((a - h).abs()).powi(2) / (histogram.bins.len() as f64))
             .fold(0.0, |acc, x| acc + x);
-        assert!(mean_square_error < 0.01, "Max difference ratio {} exceeds 1%", mean_square_error);
-        println!("Mean square error between analytic and histogram: {}", mean_square_error);
+        assert!(
+            mean_square_error < 0.01,
+            "Max difference ratio {} exceeds 1%",
+            mean_square_error
+        );
     }
 
     #[derive(Resource)]
@@ -119,26 +128,45 @@ mod tests{
         sim.world_mut().insert_resource(ApplyWallCollisions(true));
         sim.insert_resource(MarkerConfig {
             pos_range: vec![(0.0, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
-            vel_range: vec![(f64::MIN, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
+            vel_range: vec![
+                (f64::MIN, f64::MAX),
+                (f64::MIN, f64::MAX),
+                (f64::MIN, f64::MAX),
+            ],
         });
         sim.insert_resource(WriteOnce(true));
         sim.insert_resource(Interval(5));
         sim.insert_resource(Histogram::new(1000 as usize));
         sim.add_systems(Update, create_histogram_system);
-        
+
         let radius = 10e-6;
         let length = 400e-6;
 
         sim.world_mut()
-            .spawn(WallData{
-                wall_type: WallType::Rough})
-            .insert(CylindricalPipe::new(radius, length, Vector3::new(1.0, 0.0, 0.0)))
-            .insert(Position{pos: Vector3::new(-length / 2.0, 0.0, 0.0)});
+            .spawn(WallData {
+                wall_type: WallType::Rough,
+            })
+            .insert(CylindricalPipe::new(
+                radius,
+                length,
+                Vector3::new(1.0, 0.0, 0.0),
+            ))
+            .insert(Position {
+                pos: Vector3::new(-length / 2.0, 0.0, 0.0),
+            });
 
         sim.world_mut()
-            .spawn(SimulationVolume{volume_type: VolumeType::Inclusive})
-            .insert(MyCylinder::new(1500e-6, 2000e-6, Vector3::new(1.0, 0.0, 0.0)))
-            .insert(Position{pos: Vector3::new(600e-6, 0.0, 0.0)});
+            .spawn(SimulationVolume {
+                volume_type: VolumeType::Inclusive,
+            })
+            .insert(MyCylinder::new(
+                1500e-6,
+                2000e-6,
+                Vector3::new(1.0, 0.0, 0.0),
+            ))
+            .insert(Position {
+                pos: Vector3::new(600e-6, 0.0, 0.0),
+            });
 
         let number_to_emit = 1e10;
 
@@ -158,31 +186,41 @@ mod tests{
         sim.world_mut()
             .spawn(Oven::<Strontium88> {
                 temperature: 700.0,
-                aperture: OvenAperture::Circular{radius, thickness: 1e-9},
+                aperture: OvenAperture::Circular {
+                    radius,
+                    thickness: 1e-9,
+                },
                 direction: Vector3::new(1.0, 0.0, 0.0),
                 theta_distribution: uniform_distribution,
-                max_theta: PI/2.0,
+                max_theta: PI / 2.0,
                 phantom: PhantomData,
             })
             .insert(Position {
-                pos: Vector3::new(- length * 0.99999, 0.0, 0.0),
+                pos: Vector3::new(-length * 0.99999, 0.0, 0.0),
             })
             .insert(MassDistribution::new(vec![MassRatio {
                 mass: 88.0,
                 ratio: 1.0,
             }]))
-            .insert(AtomNumberToEmit{number: 0})
-            .insert(EmitFixedRate{rate: number_to_emit});
+            .insert(AtomNumberToEmit { number: 0 })
+            .insert(EmitFixedRate {
+                rate: number_to_emit,
+            });
 
         // Define timestep
         sim.world_mut().insert_resource(Timestep { delta: 2e-7 });
-        sim.world_mut().insert_resource(VelocityCap {value: f64::MAX});
+        sim.world_mut()
+            .insert_resource(VelocityCap { value: f64::MAX });
 
         // Run the simulation for a number of steps.
         for _i in 0..10000 {
             sim.update();
         }
 
-        compare_histogram_to_analytic(&sim.world().get_resource::<Histogram>().unwrap(), length, radius);
+        compare_histogram_to_analytic(
+            &sim.world().get_resource::<Histogram>().unwrap(),
+            length,
+            radius,
+        );
     }
 }

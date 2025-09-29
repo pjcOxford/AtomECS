@@ -170,7 +170,8 @@ where
         if !app.is_plugin_added::<LaserPlugin<N>>() {
             panic!("This plugin requires a LaserPlugin<N> to be added to the app first.");
         }
-        app.add_systems(Update,
+        app.add_systems(
+            Update,
             (
                 attach_components_to_newly_created_atoms::<N, T>,
                 zeeman::attach_zeeman_shift_samplers_to_newly_created_atoms::<T>,
@@ -178,7 +179,8 @@ where
             )
                 .in_set(LaserCoolingSystemsSet::Set),
         );
-        app.add_systems(Update,
+        app.add_systems(
+            Update,
             (
                 sampler_masks::populate_cooling_light_masks::<N>
                     .in_set(LaserCoolingSystemsSet::TwoLevelPopulationRequirements)
@@ -218,7 +220,8 @@ where
         //  Need to make sure each <T> 'stays in its lane', e.g. only writes values for those lasers.
         //
         // Have a base non-generic plugin, which does non-generic components, and add a generic plugin for species-specific systems?
-        app.world_mut().init_resource::<ScatteringFluctuationsOption>();
+        app.world_mut()
+            .init_resource::<ScatteringFluctuationsOption>();
     }
 }
 

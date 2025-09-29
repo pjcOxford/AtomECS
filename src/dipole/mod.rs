@@ -2,13 +2,13 @@
 
 // use specs::DispatcherBuilder;
 
-use crate::{constant};
-use crate::laser::index::LaserIndex;
+use crate::constant;
 use crate::dipole::force::apply_dipole_force_system;
+use crate::laser::index::LaserIndex;
 use crate::laser::LaserSystemsSet;
 
-use serde::{Deserialize, Serialize};
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 pub mod force;
 
@@ -75,20 +75,22 @@ pub fn attach_index_to_dipole_light_system(
 }
 
 /// This plugin implements a dipole force that can be used to confine cold atoms.
-/// 
+///
 /// See also [crate::dipole]
-/// 
+///
 /// # Generic Arguments
-/// 
+///
 /// * `N`: The maximum number of laser beams (must match the `LaserPlugin`).
-pub struct DipolePlugin<const N : usize>;
+pub struct DipolePlugin<const N: usize>;
 impl<const N: usize> Plugin for DipolePlugin<N> {
     fn build(&self, app: &mut App) {
-        app
-            .add_systems(Update, apply_dipole_force_system::<N>.after(LaserSystemsSet::Set));
-        app
-            .add_systems(Update, 
-                attach_index_to_dipole_light_system
-                .before(LaserSystemsSet::IndexLasers)); // Perhaps there is a better way of scheduling this?
+        app.add_systems(
+            Update,
+            apply_dipole_force_system::<N>.after(LaserSystemsSet::Set),
+        );
+        app.add_systems(
+            Update,
+            attach_index_to_dipole_light_system.before(LaserSystemsSet::IndexLasers),
+        ); // Perhaps there is a better way of scheduling this?
     }
 }

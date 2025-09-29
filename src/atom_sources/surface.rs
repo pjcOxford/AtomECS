@@ -6,8 +6,8 @@ use std::marker::PhantomData;
 use nalgebra::Vector3;
 
 use super::emit::AtomNumberToEmit;
-use super::VelocityCap;
 use super::species::AtomCreator;
+use super::VelocityCap;
 use rand;
 use rand::Rng;
 
@@ -21,13 +21,19 @@ use bevy::prelude::*;
 
 #[derive(Component)]
 #[component(storage = "SparseSet")]
-pub struct SurfaceSource<T> where T : AtomCreator {
+pub struct SurfaceSource<T>
+where
+    T: AtomCreator,
+{
     /// The temperature of the surface source, in Kelvin.
     pub temperature: f64,
-    pub phantom: PhantomData<T>
+    pub phantom: PhantomData<T>,
 }
 
-impl<T> MaxwellBoltzmannSource for SurfaceSource<T> where T : AtomCreator {
+impl<T> MaxwellBoltzmannSource for SurfaceSource<T>
+where
+    T: AtomCreator,
+{
     fn get_temperature(&self) -> f64 {
         self.temperature
     }
@@ -41,15 +47,18 @@ impl<T> MaxwellBoltzmannSource for SurfaceSource<T> where T : AtomCreator {
 /// The oven points in the direction [Oven.direction].
 
 pub fn create_atoms_on_surface_system<T>(
-    surfaces: Query
-            <(&SurfaceSource<T>, 
-            &Cylinder, 
-            &AtomNumberToEmit, 
-            &Position,
-            &PrecalculatedSpeciesInformation)>,
+    surfaces: Query<(
+        &SurfaceSource<T>,
+        &Cylinder,
+        &AtomNumberToEmit,
+        &Position,
+        &PrecalculatedSpeciesInformation,
+    )>,
     velocity_cap: Res<VelocityCap>,
     mut commands: Commands,
-) where T: AtomCreator + 'static {
+) where
+    T: AtomCreator + 'static,
+{
     // obey velocity cap.
     let max_vel = velocity_cap.value;
 
@@ -85,8 +94,8 @@ pub fn create_atoms_on_surface_system<T>(
             } else {
                 theta = var.asin() / 2.0 + std::f64::consts::PI / 4.0;
             }
-            let emission_direction = theta.cos() * direction
-                + theta.sin() * (perp_a * phi.cos() + perp_b * phi.sin());
+            let emission_direction =
+                theta.cos() * direction + theta.sin() * (perp_a * phi.cos() + perp_b * phi.sin());
 
             let velocity = speed * emission_direction;
 
@@ -98,7 +107,8 @@ pub fn create_atoms_on_surface_system<T>(
                     Mass { value: mass },
                     Atom,
                     InitialVelocity { vel: velocity },
-                    NewlyCreated,))
+                    NewlyCreated,
+                ))
                 .id();
             T::mutate(&mut commands, new_atom);
         }

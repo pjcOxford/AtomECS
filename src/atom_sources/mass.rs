@@ -4,7 +4,6 @@ use crate::atom::Mass;
 use rand;
 use rand::Rng;
 
-
 use serde::{Deserialize, Serialize};
 
 use bevy::prelude::*;

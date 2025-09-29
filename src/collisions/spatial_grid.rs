@@ -1,7 +1,7 @@
-use bevy::prelude::*;
-use crate::integrator::AtomECSBatchStrategy;
+use crate::atom::{Atom, Position};
 use crate::collisions::atom_collisions::CollisionParameters;
-use crate::atom::{Position, Atom};
+use crate::integrator::AtomECSBatchStrategy;
+use bevy::prelude::*;
 use nalgebra::Vector3;
 
 /// Component that marks which box an atom is in for spatial partitioning
@@ -16,13 +16,10 @@ pub fn init_boxid_system(
     mut query: Query<Entity, (Without<BoxID>, With<Atom>)>,
     mut commands: Commands,
 ) {
-    query
-        .iter_mut()
-        .for_each(|entity| {
-            commands.entity(entity).insert(BoxID { id: 0 });
-        });
+    query.iter_mut().for_each(|entity| {
+        commands.entity(entity).insert(BoxID { id: 0 });
+    });
 }
-
 
 /// Assigns box IDs to atoms
 pub fn assign_boxid_system(
@@ -38,7 +35,6 @@ pub fn assign_boxid_system(
         });
 }
 
-
 fn pos_to_id(pos: Vector3<f64>, n: i64, width: f64) -> i64 {
     //Assume that atoms that leave the grid are too sparse to collide, so disregard them
     //We'll assign them the max value of i64, and then check for this value when we do a collision and ignore them
@@ -48,17 +44,13 @@ fn pos_to_id(pos: Vector3<f64>, n: i64, width: f64) -> i64 {
     if pos[0].abs() > bound || pos[1].abs() > bound || pos[2].abs() > bound {
         id = i64::MAX;
     } else {
-        let xp: i64;
-        let yp: i64;
-        let zp: i64;
-
         // even number of boxes, vertex of a box is on origin
         // odd number of boxes, centre of a box is on the origin
         // grid cells run from [0, width), i.e include lower bound but exclude upper
 
-        xp = (pos[0] / width + 0.5 * (n as f64)).floor() as i64;
-        yp = (pos[1] / width + 0.5 * (n as f64)).floor() as i64;
-        zp = (pos[2] / width + 0.5 * (n as f64)).floor() as i64;
+        let xp: i64 = (pos[0] / width + 0.5 * (n as f64)).floor() as i64;
+        let yp: i64 = (pos[1] / width + 0.5 * (n as f64)).floor() as i64;
+        let zp: i64 = (pos[2] / width + 0.5 * (n as f64)).floor() as i64;
         //convert position to box id
         id = xp * 9803 + n * yp * 5213 + n.pow(2) * zp * 7789;
     }

@@ -2,10 +2,10 @@
 
 extern crate nalgebra;
 use crate::integrator::Timestep;
+use bevy::prelude::*;
 use rand;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
-use bevy::prelude::*;
 
 /// Component which indicates the oven should emit a number of atoms per frame.
 #[derive(Serialize, Deserialize, Clone, Component)]
@@ -32,7 +32,6 @@ pub struct EmitOnce {}
 pub struct AtomNumberToEmit {
     pub number: i32,
 }
-
 
 /// Calculates the number of atoms to emit per frame for fixed atoms-per-timestep ovens
 pub fn emit_number_per_frame_system(
@@ -65,11 +64,8 @@ pub fn emit_fixed_rate_system(
     }
 }
 
-
 /// Sets the number of atoms to emit to zero for EmitOnce sources.
-pub fn emit_once_system(
-    mut query: Query<(&EmitOnce, &mut AtomNumberToEmit)>,
-) {
+pub fn emit_once_system(mut query: Query<(&EmitOnce, &mut AtomNumberToEmit)>) {
     for (_, mut emit_numbers) in query.iter_mut() {
         emit_numbers.number = 0;
     }
@@ -88,21 +84,22 @@ mod tests {
 
         let rate = 3.3;
 
-        let emitter = test.world_mut()
-        .spawn((
-            EmitFixedRate { rate },
-            AtomNumberToEmit { number: 0 },
-        )).id();
+        let emitter = test
+            .world_mut()
+            .spawn((EmitFixedRate { rate }, AtomNumberToEmit { number: 0 }))
+            .id();
 
         let n = 1000;
         let mut total = 0;
         test.add_systems(Update, emit_fixed_rate_system);
         for _ in 1..n {
             test.update();
-            let number = test.world().entity(emitter)
-            .get::<AtomNumberToEmit>()
-            .expect("Could not get entity")
-            .number;
+            let number = test
+                .world()
+                .entity(emitter)
+                .get::<AtomNumberToEmit>()
+                .expect("Could not get entity")
+                .number;
             assert!(number == 3 || number == 4);
             total += number;
         }
@@ -116,15 +113,19 @@ mod tests {
 
         let number = 10;
 
-        let emitter = test.world_mut()
+        let emitter = test
+            .world_mut()
             .spawn((
                 EmitNumberPerFrame { number },
                 AtomNumberToEmit { number: 0 },
-            )).id();
+            ))
+            .id();
         test.add_systems(Update, emit_number_per_frame_system);
         test.update();
 
-        let emitted_number = test.world().entity(emitter)
+        let emitted_number = test
+            .world()
+            .entity(emitter)
             .get::<AtomNumberToEmit>()
             .expect("Could not get entity")
             .number;
