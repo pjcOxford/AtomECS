@@ -96,11 +96,8 @@ mod tests {
             .zip(hist_values.iter())
             .map(|(a, h)| ((a - h).abs()).powi(2) / (histogram.bins.len() as f64))
             .fold(0.0, |acc, x| acc + x);
-        assert!(
-            mean_square_error < 0.01,
-            "Max difference ratio {} exceeds 1%",
-            mean_square_error
-        );
+        assert!(mean_square_error < 1e-8,);
+        println!("mse: {}", mean_square_error);
     }
 
     #[derive(Resource)]
