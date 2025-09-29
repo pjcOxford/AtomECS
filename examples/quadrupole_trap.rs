@@ -2,18 +2,18 @@
 
 extern crate atomecs as lib;
 extern crate nalgebra;
+use bevy::prelude::*;
 use lib::atom::{Atom, Force, Mass, Position, Velocity};
 use lib::initiate::NewlyCreated;
 use lib::integrator::Timestep;
 use lib::magnetic::force::MagneticDipole;
 use lib::magnetic::quadrupole::QuadrupoleField3D;
-use lib::simulation::SimulationBuilder;
-use rand_distr::{Distribution, Normal};
-
-use bevy::prelude::*;
+use lib::magnetic::MagneticsPlugin;
 use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
+use lib::simulation::SimulationBuilder;
 use nalgebra::Vector3;
+use rand_distr::{Distribution, Normal};
 use std::time::Instant;
 
 fn main() {
@@ -28,7 +28,7 @@ fn main() {
         "vel.txt".to_string(),
         100,
     ));
-
+    sim_builder.add_plugins(MagneticsPlugin);
     let mut sim = sim_builder.build();
 
     // Create magnetic field.

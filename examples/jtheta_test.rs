@@ -119,7 +119,7 @@ fn main() {
         .insert_resource(VelocityCap { value: f64::MAX });
 
     // Run the simulation for a number of steps.
-    for _i in 0..5_000 {
+    for _i in 0..1_000 {
         sim.update();
     }
     println!("Simulation completed in {} ms.", now.elapsed().as_millis());

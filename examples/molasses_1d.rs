@@ -8,6 +8,7 @@ use lib::laser::gaussian::GaussianBeam;
 use lib::laser::LaserPlugin;
 use lib::laser_cooling::photons_scattered::ActualPhotonsScatteredVector;
 use lib::laser_cooling::{CoolingLight, LaserCoolingPlugin};
+use lib::magnetic::MagneticsPlugin;
 use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
 use lib::simulation::SimulationBuilder;
@@ -19,6 +20,7 @@ const BEAM_NUMBER: usize = 2;
 fn main() {
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(LaserPlugin::<{ BEAM_NUMBER }>);
+    sim_builder.add_plugins(MagneticsPlugin);
     sim_builder.add_plugins(LaserCoolingPlugin::<Rubidium87_780D2, { BEAM_NUMBER }>::default());
     sim_builder.add_plugins(FileOutputPlugin::<
         ActualPhotonsScatteredVector<Rubidium87_780D2, { BEAM_NUMBER }>,

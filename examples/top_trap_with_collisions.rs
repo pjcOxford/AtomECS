@@ -13,6 +13,7 @@ use lib::magnetic::force::MagneticDipole;
 use lib::magnetic::quadrupole::QuadrupoleField3D;
 use lib::magnetic::top::UniformFieldRotator;
 use lib::magnetic::uniform::UniformMagneticField;
+use lib::magnetic::MagneticsPlugin;
 use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
 use lib::simulation::SimulationBuilder;
@@ -25,6 +26,7 @@ use std::time::Instant;
 fn main() {
     let now = Instant::now();
     let mut sim_builder = SimulationBuilder::default();
+    sim_builder.add_plugins(MagneticsPlugin);
     sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new(
         "pos.txt".to_string(),
         100,

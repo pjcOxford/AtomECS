@@ -7,6 +7,7 @@ use lib::dipole::{self, DipolePlugin};
 use lib::integrator::Timestep;
 use lib::laser::gaussian::GaussianBeam;
 use lib::laser::{self, LaserPlugin, RequiresIntensityGradientCalculation};
+use lib::magnetic::MagneticsPlugin;
 use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
 use lib::simulation::SimulationBuilder;
@@ -22,6 +23,7 @@ fn main() {
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(LaserPlugin::<{ BEAM_NUMBER }>);
     sim_builder.add_plugins(DipolePlugin::<{ BEAM_NUMBER }>);
+    sim_builder.add_plugins(MagneticsPlugin);
     sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new(
         "pos.txt".to_string(),
         100,

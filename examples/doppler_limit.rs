@@ -20,6 +20,7 @@ use lib::laser_cooling::force::{EmissionForceConfiguration, EmissionForceOption}
 use lib::laser_cooling::photons_scattered::ScatteringFluctuationsOption;
 use lib::laser_cooling::{CoolingLight, LaserCoolingPlugin};
 use lib::magnetic::quadrupole::QuadrupoleField3D;
+use lib::magnetic::MagneticsPlugin;
 use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
 use lib::simulation::SimulationBuilder;
@@ -63,6 +64,7 @@ fn main() {
     // Create the simulation
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(LaserPlugin::<{ BEAM_NUMBER }>);
+    sim_builder.add_plugins(MagneticsPlugin);
     sim_builder.add_plugins(LaserCoolingPlugin::<Rubidium87_780D2, { BEAM_NUMBER }>::default());
     sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new(
         "vel.txt".to_string(),

@@ -15,6 +15,7 @@ mod tests {
     };
     use crate::laser_cooling::transition::AtomicTransition;
     use crate::laser_cooling::{CoolingLight, LaserCoolingPlugin};
+    use crate::magnetic::MagneticsPlugin;
     use crate::simulation;
     use crate::species::Rubidium87_780D2;
     use assert_approx_eq::assert_approx_eq;
@@ -49,6 +50,7 @@ mod tests {
 
         // Create simulation dispatcher
         let mut simulation = simulation::SimulationBuilder::default().build();
+        simulation.add_plugins(MagneticsPlugin);
         simulation.add_plugins(LaserPlugin::<{ BEAM_NUMBER }>);
         simulation.add_plugins(LaserCoolingPlugin::<Rubidium87_780D2, { BEAM_NUMBER }>::default());
 

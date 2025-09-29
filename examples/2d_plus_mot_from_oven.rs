@@ -14,6 +14,7 @@ use lib::laser::gaussian::GaussianBeam;
 use lib::laser::LaserPlugin;
 use lib::laser_cooling::{CoolingLight, LaserCoolingPlugin};
 use lib::magnetic::quadrupole::QuadrupoleField3D;
+use lib::magnetic::MagneticsPlugin;
 use lib::output::file::FileOutputPlugin;
 use lib::output::file::Text;
 use lib::shapes::Cuboid;
@@ -24,7 +25,6 @@ use lib::simulation::SimulationBuilder;
 use lib::species::{Strontium88, Strontium88_461};
 use nalgebra::Vector3;
 use std::time::Instant;
-
 const BEAM_NUMBER: usize = 6;
 
 fn main() {
@@ -33,6 +33,7 @@ fn main() {
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(LaserPlugin::<{ BEAM_NUMBER }>);
     sim_builder.add_plugins(LaserCoolingPlugin::<Strontium88_461, { BEAM_NUMBER }>::default());
+    sim_builder.add_plugins(MagneticsPlugin);
     sim_builder.add_plugins(AtomSourcePlugin::<Strontium88>::default());
     sim_builder.add_plugins(FileOutputPlugin::<Position, Text>::new(
         "pos.txt".to_string(),
