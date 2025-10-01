@@ -2,11 +2,12 @@
 
 use std::marker::PhantomData;
 
-use super::{species::AtomCreator, WeightedProbabilityDistribution};
+use super::species::AtomCreator;
 use crate::atom::*;
 use crate::atom_sources::emit::AtomNumberToEmit;
 use crate::constant::EXP;
 use crate::initiate::*;
+use crate::probability_distribution::WeightedProbabilityDistribution;
 use nalgebra::Vector3;
 
 use rand;

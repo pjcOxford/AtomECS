@@ -8,17 +8,9 @@ pub mod precalc;
 pub mod species;
 pub mod surface;
 
-use bevy::prelude::*;
-
-use rand;
-use rand::distr::weighted::WeightedIndex;
-use rand::distr::Distribution;
-use rand::Rng;
-use std::marker::PhantomData;
-
-// use crate::simulation::Plugin;
-
 use self::species::AtomCreator;
+use bevy::prelude::*;
+use std::marker::PhantomData;
 
 #[derive(Resource)]
 pub struct VelocityCap {
@@ -74,27 +66,5 @@ where
                     .after(gaussian::gaussian_create_atoms_system::<T>),
             ),
         );
-    }
-}
-
-/// A simple probability distribution which uses weighted indices to retrieve values.
-pub struct WeightedProbabilityDistribution {
-    values: Vec<f64>,
-    weighted_index: WeightedIndex<f64>,
-}
-
-impl WeightedProbabilityDistribution {
-    pub fn new(values: Vec<f64>, weights: Vec<f64>) -> Self {
-        WeightedProbabilityDistribution {
-            values,
-            weighted_index: WeightedIndex::new(&weights).unwrap(),
-        }
-    }
-}
-
-impl Distribution<f64> for WeightedProbabilityDistribution {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> f64 {
-        let index = self.weighted_index.sample(rng);
-        self.values[index]
     }
 }

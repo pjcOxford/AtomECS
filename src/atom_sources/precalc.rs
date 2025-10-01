@@ -1,8 +1,8 @@
 //! Utilities for precalculating quantities such as mass and velocity distributions.
 
 use super::mass::MassDistribution;
-use super::WeightedProbabilityDistribution;
 use crate::constant::{AMU, BOLTZCONST, EXP};
+use crate::probability_distribution::WeightedProbabilityDistribution;
 
 use rand;
 use rand::distr::weighted::WeightedIndex;
@@ -19,7 +19,7 @@ use bevy::prelude::*;
 /// `temperature`: The temperature of the oven, in units of Kelvin.
 ///
 /// `mass`: The mass of the particle, in SI units of kg.
-fn create_v_distribution(
+pub fn create_v_distribution(
     temperature: f64,
     mass: f64,
     power: f64,

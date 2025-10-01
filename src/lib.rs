@@ -24,6 +24,7 @@ pub mod magnetic;
 pub mod marker;
 pub mod maths;
 pub mod output;
+pub mod probability_distribution;
 pub mod ramp;
 pub mod shapes;
 pub mod sim_region;

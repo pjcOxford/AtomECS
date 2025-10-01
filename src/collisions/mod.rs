@@ -10,10 +10,6 @@ use crate::shapes::{
     Cuboid as MyCuboid, Cylinder as MyCylinder, CylindricalPipe, Sphere as MySphere,
 };
 use bevy::prelude::*;
-use rand;
-use rand::distr::weighted::WeightedIndex;
-use rand::distr::Distribution;
-use rand::Rng;
 use std::fmt;
 
 /// A resource that indicates that the simulation should apply atom collisions
@@ -107,6 +103,12 @@ impl Plugin for CollisionPlugin {
                 .run_if(apply_wall_collisions),
         );
         app.add_systems(
+            Startup,
+            create_maxwellian_distribution
+                .in_set(CollisionsSet::Set)
+                .run_if(apply_wall_collisions),
+        );
+        app.add_systems(
             PreUpdate,
             assign_location_status_system
                 .in_set(CollisionsSet::WallCollisionSystems)
@@ -152,28 +154,5 @@ impl Plugin for CollisionPlugin {
                 .after(IntegrationSet::BeginIntegration)
                 .run_if(apply_wall_collisions),
         );
-    }
-}
-
-/// A copy of weighted probability distribution, used for the Lambertian cosine distribution
-#[derive(Resource)]
-pub struct LambertianProbabilityDistribution {
-    values: Vec<f64>,
-    weighted_index: WeightedIndex<f64>,
-}
-
-impl LambertianProbabilityDistribution {
-    pub fn new(values: Vec<f64>, weights: Vec<f64>) -> Self {
-        LambertianProbabilityDistribution {
-            values,
-            weighted_index: WeightedIndex::new(&weights).unwrap(),
-        }
-    }
-}
-
-impl Distribution<f64> for LambertianProbabilityDistribution {
-    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> f64 {
-        let index = self.weighted_index.sample(rng);
-        self.values[index]
     }
 }

@@ -77,6 +77,7 @@ fn main() {
     sim.world_mut()
         .spawn(WallData {
             wall_type: WallType::Rough,
+            ..Default::default()
         })
         .insert(MySphere { radius: 5e-2 })
         .insert(Position {

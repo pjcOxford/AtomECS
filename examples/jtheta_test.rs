@@ -5,13 +5,14 @@ use lib::atom::{Position, Velocity};
 use lib::atom_sources::emit::{AtomNumberToEmit, EmitFixedRate};
 use lib::atom_sources::mass::{MassDistribution, MassRatio};
 use lib::atom_sources::oven::{Oven, OvenAperture};
-use lib::atom_sources::{AtomSourcePlugin, VelocityCap, WeightedProbabilityDistribution};
+use lib::atom_sources::{AtomSourcePlugin, VelocityCap};
 use lib::collisions::wall_collisions::{WallData, WallType};
 use lib::collisions::{ApplyAtomCollisions, ApplyWallCollisions, CollisionPlugin};
 use lib::constant::PI;
 use lib::integrator::Timestep;
 use lib::marker::{Interval, MarkerConfig, WriteOnce};
 use lib::output::file::{FileOutputPlugin, Text};
+use lib::probability_distribution::WeightedProbabilityDistribution;
 use lib::shapes::{Cylinder as MyCylinder, CylindricalPipe};
 use lib::sim_region::{SimulationVolume, VolumeType};
 use lib::simulation::SimulationBuilder;
@@ -51,6 +52,8 @@ fn main() {
     sim.world_mut()
         .spawn(WallData {
             wall_type: WallType::Rough,
+            wall_temp: Some(700.0),
+            ..Default::default()
         })
         .insert(CylindricalPipe::new(
             radius,

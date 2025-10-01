@@ -11,7 +11,7 @@ use crate::constant::PI;
 use crate::initiate::*;
 
 use super::VelocityCap;
-use super::WeightedProbabilityDistribution;
+use crate::probability_distribution::WeightedProbabilityDistribution;
 use rand;
 use rand::distr::Distribution;
 use rand::Rng;

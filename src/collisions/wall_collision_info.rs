@@ -1,5 +1,3 @@
-// An attempt at making wall_collision not so horrendously big
-
 use crate::shapes::{Cuboid, Cylinder, CylindricalPipe, Sphere};
 use nalgebra::Vector3;
 
@@ -31,7 +29,7 @@ trait SDF {
     fn signed_distance(&self, point: &Vector3<f64>) -> f64;
 }
 
-/// Credit to Inigo Quilez's for the SDFs. Found at https://www.shadertoy.com/view/Xds3zN
+/// Credit to Inigo Quilez for the SDFs. Found at https://www.shadertoy.com/view/Xds3zN. Accessed Aug 2025
 
 /// Signed distance to a sphere.
 impl SDF for Sphere {
@@ -193,7 +191,6 @@ impl Normal for Sphere {
     ) -> Option<Vector3<f64>> {
         let normal_vector = point - wall_pos;
 
-        // Gives the normal assuming collision from the inside
         if (normal_vector.norm() - self.radius).abs() < tolerance {
             Some(-normal_vector.normalize())
         } else {
@@ -211,7 +208,6 @@ impl Normal for Cuboid {
     ) -> Option<Vector3<f64>> {
         let local = point - wall_pos;
 
-        // Gives the normal assuming collision from the inside
         if (local.x.abs() - self.half_width.x).abs() < tolerance {
             Some(-Vector3::new(local.x.signum(), 0.0, 0.0))
         } else if (local.y.abs() - self.half_width.y).abs() < tolerance {
@@ -241,7 +237,6 @@ impl Normal for Cylinder {
 
         let axial_dist_to_surface = local.z.abs() - self.length * 0.5;
         let radial_dist_to_surface = (local.x.powi(2) + local.y.powi(2)).sqrt() - self.radius;
-        // Gives the normal assuming collision from the inside
         if axial_dist_to_surface.abs() < tolerance && radial_dist_to_surface < 0.0 {
             let normal = self.direction * local.z.signum();
             Some(-normal)

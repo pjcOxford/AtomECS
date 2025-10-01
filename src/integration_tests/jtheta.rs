@@ -4,13 +4,14 @@ mod tests {
     use crate::atom_sources::emit::{AtomNumberToEmit, EmitFixedRate};
     use crate::atom_sources::mass::{MassDistribution, MassRatio};
     use crate::atom_sources::oven::{Oven, OvenAperture};
-    use crate::atom_sources::{AtomSourcePlugin, VelocityCap, WeightedProbabilityDistribution};
+    use crate::atom_sources::{AtomSourcePlugin, VelocityCap};
     use crate::collisions::wall_collisions::{WallData, WallType};
     use crate::collisions::{ApplyAtomCollisions, ApplyWallCollisions, CollisionPlugin};
     use crate::constant::PI;
     use crate::integrator::Step;
     use crate::integrator::Timestep;
     use crate::marker::{Interval, Marker, MarkerConfig, WriteOnce, WriteOrNot};
+    use crate::probability_distribution::WeightedProbabilityDistribution;
     use crate::shapes::{Cylinder as MyCylinder, CylindricalPipe};
     use crate::sim_region::{SimulationVolume, VolumeType};
     use crate::simulation::SimulationBuilder;
@@ -143,6 +144,7 @@ mod tests {
         sim.world_mut()
             .spawn(WallData {
                 wall_type: WallType::Rough,
+                ..Default::default()
             })
             .insert(CylindricalPipe::new(
                 radius,

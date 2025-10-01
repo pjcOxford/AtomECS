@@ -5,13 +5,14 @@
 //! Will miss some collisions if (passing through the wall in a single timestep).
 //! Best to only use with closed volumes, with atoms initialized inside the volume, or the cylindrical pipe, initialized inside the pipe.
 
-use super::LambertianProbabilityDistribution;
 use crate::atom::{Atom, Position, Velocity};
+use crate::atom_sources::precalc::create_v_distribution;
 use crate::collisions::wall_collision_info::*;
 use crate::collisions::NumberOfWallCollisions;
-use crate::constant::{EXP, PI};
+use crate::constant::{AMU, EXP, PI};
 use crate::initiate::NewlyCreated;
 use crate::integrator::{AtomECSBatchStrategy, Timestep};
+use crate::probability_distribution::WeightedProbabilityDistribution;
 use crate::shapes::{
     Cuboid as MyCuboid, Cylinder as MyCylinder, CylindricalPipe, Sphere as MySphere, Volume,
 }; // Aliasing issues with bevy.
@@ -31,8 +32,19 @@ pub struct SurfaceThreshold(pub f64); // Tolerance for convergence
 #[component(storage = "SparseSet")]
 pub struct WallData {
     pub wall_type: WallType,
+    pub wall_temp: Option<f64>,
+    pub speed_distribution: Option<WeightedProbabilityDistribution>,
 }
 
+impl Default for WallData {
+    fn default() -> Self {
+        WallData {
+            wall_type: WallType::Rough,
+            wall_temp: None,
+            speed_distribution: None,
+        }
+    }
+}
 /// Enum for designating wall type for collisions
 pub enum WallType {
     // Specular
@@ -181,7 +193,7 @@ fn specular(collision_normal: &Vector3<f64>, velocity: &Vector3<f64>) -> Vector3
 fn diffuse(
     collision_normal: &Vector3<f64>,
     velocity: &Vector3<f64>,
-    distribution: &LambertianProbabilityDistribution,
+    distribution: &WeightedProbabilityDistribution,
 ) -> Vector3<f64> {
     // Get random weighted angles
     let mut rng = rand::rng();
@@ -216,12 +228,22 @@ pub fn create_cosine_distribution(mut commands: Commands) {
         weights.push(weight);
         // Note: we can exclude d_theta because it is constant and the distribution will be normalized.
     }
-    let cosine_distribution = LambertianProbabilityDistribution::new(thetas, weights);
-    commands.insert_resource::<LambertianProbabilityDistribution>(cosine_distribution);
+    let cosine_distribution = WeightedProbabilityDistribution::new(thetas, weights);
+    commands.insert_resource::<WeightedProbabilityDistribution>(cosine_distribution);
     println!("Cosine distribution created!")
 }
 
-/// Do wall collision
+// Create maxwellian probability distribution for a wall with a temp
+// To be run once on startup
+pub fn create_maxwellian_distribution(mut query: Query<&mut WallData>) {
+    for mut wall in query.iter_mut() {
+        if let Some(temp) = wall.wall_temp {
+            wall.speed_distribution = Some(create_v_distribution(temp, 88.0 * AMU, 2.0));
+        }
+    }
+}
+
+// Do wall collision
 fn do_wall_collision(
     atom: (
         &mut Position,
@@ -231,7 +253,7 @@ fn do_wall_collision(
     ),
     wall: &WallData,
     collision: &CollisionInfo,
-    distribution: &LambertianProbabilityDistribution,
+    distribution: &WeightedProbabilityDistribution,
     dt: f64,
 ) {
     let (pos, vel, time, num_of_collisions) = atom;
@@ -248,12 +270,22 @@ fn do_wall_collision(
     // do collision
     match wall.wall_type {
         WallType::Smooth => vel.vel = specular(&collision.collision_normal, &vel.vel),
-        WallType::Rough => vel.vel = diffuse(&collision.collision_normal, &vel.vel, distribution),
+        WallType::Rough => {
+            vel.vel = diffuse(&collision.collision_normal, &vel.vel, distribution);
+            if let Some(distribution) = &wall.speed_distribution {
+                let speed = distribution.sample(&mut rand::rng());
+                vel.vel = vel.vel / vel.vel.norm() * speed;
+            }
+        }
         WallType::Random { spec_prob } => {
             if rand::rng().random_bool(spec_prob) {
                 vel.vel = specular(&collision.collision_normal, &vel.vel)
             } else {
-                vel.vel = diffuse(&collision.collision_normal, &vel.vel, distribution)
+                vel.vel = diffuse(&collision.collision_normal, &vel.vel, distribution);
+                if let Some(distribution) = &wall.speed_distribution {
+                    let speed = distribution.sample(&mut rand::rng());
+                    vel.vel = vel.vel / vel.vel.norm() * speed;
+                }
             }
         }
         WallType::Exponential { value } => {
@@ -264,7 +296,11 @@ fn do_wall_collision(
             if rand::rng().random_bool(prob_spec) {
                 vel.vel = specular(&collision.collision_normal, &vel.vel)
             } else {
-                vel.vel = diffuse(&collision.collision_normal, &vel.vel, distribution)
+                vel.vel = diffuse(&collision.collision_normal, &vel.vel, distribution);
+                if let Some(distribution) = &wall.speed_distribution {
+                    let speed = distribution.sample(&mut rand::rng());
+                    vel.vel = vel.vel / vel.vel.norm() * speed;
+                }
             }
         }
     }
@@ -289,7 +325,7 @@ pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
     timestep: Res<Timestep>,
     threshold: Res<SurfaceThreshold>,
     max_steps: Res<MaxSteps>,
-    distribution: Res<LambertianProbabilityDistribution>,
+    distribution: Res<WeightedProbabilityDistribution>,
 ) {
     let tolerance = threshold.0;
     let max_steps = max_steps.0;
@@ -433,6 +469,7 @@ mod tests {
                 .spawn(wall_position.clone())
                 .insert(WallData {
                     wall_type: WallType::Smooth,
+                    ..Default::default()
                 })
                 .insert(wall)
                 .id();
@@ -532,6 +569,7 @@ mod tests {
             .id();
         app.world_mut().spawn(WallData {
             wall_type: WallType::Smooth,
+            ..Default::default()
         });
         let collision_point = Vector3::new(0.0, 0.0, 0.0);
 
@@ -543,7 +581,7 @@ mod tests {
                 &mut NumberOfWallCollisions,
             )>,
             wall: Query<&WallData>,
-            distribution: Res<LambertianProbabilityDistribution>,
+            distribution: Res<WeightedProbabilityDistribution>,
         ) {
             query
                 .iter_mut()
@@ -625,7 +663,7 @@ mod tests {
         app.update();
         let distribution = app
             .world()
-            .get_resource::<LambertianProbabilityDistribution>()
+            .get_resource::<WeightedProbabilityDistribution>()
             .unwrap();
 
         let num_scattered = 100_000;
@@ -672,6 +710,7 @@ mod tests {
         app.world_mut()
             .spawn(WallData {
                 wall_type: WallType::Smooth,
+                ..Default::default()
             })
             .insert(CylindricalPipe::new(1.0, 8.0, Vector3::new(0.0, 0.0, 1.0)))
             .insert(Position {
