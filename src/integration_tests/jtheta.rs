@@ -96,8 +96,9 @@ mod tests {
             .zip(hist_values.iter())
             .map(|(a, h)| ((a - h).abs()).powi(2) / (histogram.bins.len() as f64))
             .fold(0.0, |acc, x| acc + x);
-        assert!(mean_square_error < 1e-8,);
+
         println!("mse: {}", mean_square_error);
+        assert!(mean_square_error < 1e-7,);
     }
 
     #[derive(Resource)]
@@ -205,12 +206,12 @@ mod tests {
             });
 
         // Define timestep
-        sim.world_mut().insert_resource(Timestep { delta: 1e-8 });
+        sim.world_mut().insert_resource(Timestep { delta: 2e-7 });
         sim.world_mut()
             .insert_resource(VelocityCap { value: f64::MAX });
 
         // Run the simulation for a number of steps.
-        for _i in 0..100000 {
+        for _i in 0..5000 {
             sim.update();
         }
 

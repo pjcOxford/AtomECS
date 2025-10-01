@@ -64,7 +64,7 @@ pub trait Wall {
     /// Collision check for open walls
     fn preliminary_collision_check(
         &self,
-        atom_pos: &Vector3<f64>,
+        pos: &Vector3<f64>,
         atom_vel: &Vector3<f64>,
         atom_location: &VolumeStatus,
         wall_pos: &Vector3<f64>,
@@ -75,15 +75,15 @@ pub trait Wall {
 impl<T: Volume> Wall for T {
     fn preliminary_collision_check(
         &self,
-        atom_pos: &Vector3<f64>,
+        pos: &Vector3<f64>,
         _atom_vel: &Vector3<f64>,
         atom_location: &VolumeStatus,
         wall_pos: &Vector3<f64>,
         _dt: f64,
     ) -> bool {
         match atom_location {
-            VolumeStatus::Inside => !self.contains(wall_pos, atom_pos),
-            VolumeStatus::Outside => self.contains(wall_pos, atom_pos),
+            VolumeStatus::Inside => !self.contains(wall_pos, pos),
+            VolumeStatus::Outside => self.contains(wall_pos, pos),
             VolumeStatus::Open => false,
         }
     }
@@ -92,17 +92,17 @@ impl<T: Volume> Wall for T {
 impl Wall for CylindricalPipe {
     fn preliminary_collision_check(
         &self,
-        atom_pos: &Vector3<f64>,
+        pos: &Vector3<f64>,
         atom_vel: &Vector3<f64>,
         _atom_location: &VolumeStatus,
         wall_pos: &Vector3<f64>,
         dt: f64,
     ) -> bool {
-        let delta_prev = (atom_pos - atom_vel * dt) - wall_pos;
+        let delta_prev = (pos - atom_vel * dt) - wall_pos;
         let axial_prev = delta_prev.dot(&self.direction);
         let radial_prev = delta_prev - axial_prev * self.direction;
 
-        let delta_curr = atom_pos - wall_pos;
+        let delta_curr = pos - wall_pos;
         let axial_curr = delta_curr.dot(&self.direction);
         let radial_curr = delta_curr - axial_curr * self.direction;
 
@@ -121,31 +121,31 @@ impl Wall for CylindricalPipe {
 
 /// Checks which atoms have collided.
 fn collision_check<T: Wall + Intersect + Normal>(
-    atom: (&Position, &Velocity, &VolumeStatus),
+    atom: (&Position, &Velocity, &TimeElapsed, &VolumeStatus),
     wall: (&T, &Position),
     dt: f64,
     tolerance: f64,
     max_steps: i32,
 ) -> Option<CollisionInfo> {
-    let (atom_pos, atom_vel, atom_location) = atom;
+    let (pos, atom_vel, time, atom_location) = atom;
     let (shape, wall_pos) = wall;
 
     if !shape.preliminary_collision_check(
-        &atom_pos.pos,
+        &pos.pos,
         &atom_vel.vel,
         atom_location,
         &wall_pos.pos,
-        dt,
+        dt - time.0,
     ) {
         return None;
     }
 
     // Do collision check
     if let Some(mut collision_point) = shape.calculate_intersect(
-        &atom_pos.pos,
+        &pos.pos,
         &atom_vel.vel,
         &wall_pos.pos,
-        dt,
+        dt - time.0,
         tolerance,
         max_steps,
     ) {
@@ -163,7 +163,7 @@ fn collision_check<T: Wall + Intersect + Normal>(
         } else {
             eprintln!(
                 "Warning: Could not calculate normal. Atom: {:?}, Wall Pos: {:?}",
-                atom_pos.pos, wall_pos.pos
+                pos.pos, wall_pos.pos
             );
             None
         }
@@ -233,44 +233,42 @@ fn do_wall_collision(
     collision: &CollisionInfo,
     distribution: &LambertianProbabilityDistribution,
     dt: f64,
-) -> f64 {
-    let (atom_pos, atom_vel, time, num_of_collisions) = atom;
+) {
+    let (pos, vel, time, num_of_collisions) = atom;
     num_of_collisions.value += 1;
     // subtract distance traveled to the collision point from prev position
-    let traveled = ((atom_pos.pos - atom_vel.vel * dt) - collision.collision_point).norm();
-    let time_spent = traveled / atom_vel.vel.norm();
+    let traveled = ((pos.pos - vel.vel * (dt - time.0)) - collision.collision_point).norm();
+    let time_spent = traveled / vel.vel.norm();
     time.0 += time_spent;
     if time.0 > dt {
-        // eprint!("more time spent than possible");
+        eprint!("more time spent than possible");
+        time.0 = dt;
     }
 
     // do collision
     match wall.wall_type {
-        WallType::Smooth => atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel),
-        WallType::Rough => {
-            atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, distribution)
-        }
+        WallType::Smooth => vel.vel = specular(&collision.collision_normal, &vel.vel),
+        WallType::Rough => vel.vel = diffuse(&collision.collision_normal, &vel.vel, distribution),
         WallType::Random { spec_prob } => {
             if rand::rng().random_bool(spec_prob) {
-                atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel)
+                vel.vel = specular(&collision.collision_normal, &vel.vel)
             } else {
-                atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, distribution)
+                vel.vel = diffuse(&collision.collision_normal, &vel.vel, distribution)
             }
         }
         WallType::Exponential { value } => {
             let angle_of_incidence =
-                (atom_vel.vel.dot(&collision.collision_normal) / atom_vel.vel.norm()).acos();
+                (vel.vel.dot(&collision.collision_normal) / vel.vel.norm()).acos();
             let prob_spec =
                 (EXP.powf(value * angle_of_incidence) - 1.0) / (EXP.powf(value * PI / 2.0) - 1.0);
             if rand::rng().random_bool(prob_spec) {
-                atom_vel.vel = specular(&collision.collision_normal, &atom_vel.vel)
+                vel.vel = specular(&collision.collision_normal, &vel.vel)
             } else {
-                atom_vel.vel = diffuse(&collision.collision_normal, &atom_vel.vel, distribution)
+                vel.vel = diffuse(&collision.collision_normal, &vel.vel, distribution)
             }
         }
     }
-    atom_pos.pos = collision.collision_point + atom_vel.vel * (dt - time.0);
-    traveled / atom_vel.vel.norm()
+    pos.pos = collision.collision_point + vel.vel * (dt - time.0);
 }
 
 /// Do the collisions
@@ -301,26 +299,20 @@ pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
         .par_iter_mut()
         .batching_strategy(batch_strategy.0.clone())
         .for_each(|(mut pos, mut vel, mut time, mut collisions, location)| {
-            let mut dt_atom = dt;
             let mut num_of_collisions = 0;
 
             while time.0 < dt && num_of_collisions < 10000 {
                 let mut collided = false;
                 for (shape, wall, wall_pos) in &walls {
                     if let Some(collision_info) = collision_check(
-                        (&pos, &vel, location),
+                        (&pos, &vel, &time, location),
                         (*shape, *wall_pos),
-                        dt_atom,
+                        dt,
                         tolerance,
                         max_steps,
                     ) {
-                        let distance = (dt - time.0) * vel.vel.norm();
-                        // print!(
-                        //     "distance: {}, position:{}, velocity:{}, collision point:{}",
-                        //     distance, pos.pos, vel.vel, collision_info.collision_point
-                        // );
                         // Handle the collision
-                        let time_used = do_wall_collision(
+                        do_wall_collision(
                             (&mut pos, &mut vel, &mut time, &mut collisions),
                             wall,
                             &collision_info,
@@ -328,10 +320,6 @@ pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
                             dt,
                         );
                         collided = true;
-                        dt_atom -= time_used;
-                        if dt_atom < 0.0 {
-                            dt_atom = 0.0
-                        }
                     }
                 }
 
@@ -417,7 +405,7 @@ mod tests {
         // Helper function to test collisions
         fn test_collision<T>(
             app: &mut App,
-            atom_pos: Vector3<f64>,
+            pos: Vector3<f64>,
             wall_pos: Vector3<f64>,
             wall: T,
             expected_point: Vector3<f64>,
@@ -427,13 +415,14 @@ mod tests {
             let velocity = Velocity {
                 vel: Vector3::new(1.0, 0.0, 0.0),
             };
-            let position = Position { pos: atom_pos };
+            let position = Position { pos: pos };
             let dt = 1.0 + 1e-15;
 
             let atom = app
                 .world_mut()
                 .spawn(position.clone())
                 .insert(velocity.clone())
+                .insert(TimeElapsed(0.0))
                 .insert(Atom)
                 .insert(VolumeStatus::Inside)
                 .id();
@@ -451,7 +440,12 @@ mod tests {
             let wall_component = app.world().entity(wall_entity).get::<T>().unwrap();
 
             let result = collision_check(
-                (&position, &velocity, &VolumeStatus::Inside),
+                (
+                    &position,
+                    &velocity,
+                    &TimeElapsed(0.0),
+                    &VolumeStatus::Inside,
+                ),
                 (wall_component, &wall_position),
                 dt,
                 TOLERANCE,
@@ -552,7 +546,7 @@ mod tests {
             distribution: Res<LambertianProbabilityDistribution>,
         ) {
             query.iter_mut().for_each(
-                |(mut atom_pos, mut atom_vel, mut time_elapsed, mut collisions)| {
+                |(mut pos, mut atom_vel, mut time_elapsed, mut collisions)| {
                     for wall in wall.iter() {
                         let dt = 1.0 - 1e-10; // If you change this make sure to change the dt above as well
                         let collision_point = Vector3::new(0.0, 0.0, 0.0);
@@ -562,12 +556,7 @@ mod tests {
                             collision_normal,
                         };
                         do_wall_collision(
-                            (
-                                &mut atom_pos,
-                                &mut atom_vel,
-                                &mut time_elapsed,
-                                &mut collisions,
-                            ),
+                            (&mut pos, &mut atom_vel, &mut time_elapsed, &mut collisions),
                             wall,
                             &collision_info,
                             &distribution,
