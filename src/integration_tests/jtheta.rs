@@ -52,7 +52,7 @@ mod tests {
         mut query: Query<(&Velocity, &Marker)>,
         mut histogram: ResMut<Histogram>,
     ) {
-        if step.n % 5 != 0 {
+        if step.n % 100 != 0 {
             return;
         }
 
@@ -132,7 +132,7 @@ mod tests {
             ],
         });
         sim.insert_resource(WriteOnce(true));
-        sim.insert_resource(Interval(5));
+        sim.insert_resource(Interval(100));
         sim.insert_resource(Histogram::new(1000 as usize));
         sim.add_systems(Update, create_histogram_system);
 
@@ -205,12 +205,12 @@ mod tests {
             });
 
         // Define timestep
-        sim.world_mut().insert_resource(Timestep { delta: 2e-7 });
+        sim.world_mut().insert_resource(Timestep { delta: 1e-8 });
         sim.world_mut()
             .insert_resource(VelocityCap { value: f64::MAX });
 
         // Run the simulation for a number of steps.
-        for _i in 0..5000 {
+        for _i in 0..100000 {
             sim.update();
         }
 

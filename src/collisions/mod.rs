@@ -120,7 +120,7 @@ impl Plugin for CollisionPlugin {
         );
         app.add_systems(
             PreUpdate,
-            update_distance_to_travel_system
+            clear_time_elapsed_system
                 .in_set(CollisionsSet::WallCollisionSystems)
                 .run_if(apply_wall_collisions),
         );

@@ -46,9 +46,7 @@ pub enum WallType {
 }
 
 #[derive(Component)]
-pub struct DistanceToTravel {
-    pub distance_to_travel: f64,
-}
+pub struct TimeElapsed(f64);
 
 #[derive(Component)]
 pub enum VolumeStatus {
@@ -228,23 +226,22 @@ fn do_wall_collision(
     atom: (
         &mut Position,
         &mut Velocity,
-        &mut DistanceToTravel,
+        &mut TimeElapsed,
         &mut NumberOfWallCollisions,
     ),
     wall: &WallData,
     collision: &CollisionInfo,
     distribution: &LambertianProbabilityDistribution,
     dt: f64,
-    tolerance: f64,
 ) -> f64 {
-    let (atom_pos, atom_vel, distance, num_of_collisions) = atom;
+    let (atom_pos, atom_vel, time, num_of_collisions) = atom;
     num_of_collisions.value += 1;
     // subtract distance traveled to the collision point from prev position
     let traveled = ((atom_pos.pos - atom_vel.vel * dt) - collision.collision_point).norm();
-    distance.distance_to_travel -= traveled;
-    if -distance.distance_to_travel > tolerance {
-        distance.distance_to_travel = 0.0;
-        eprintln!("Distance to travel set to a negative value somehow");
+    let time_spent = traveled / atom_vel.vel.norm();
+    time.0 += time_spent;
+    if time.0 > dt {
+        // eprint!("more time spent than possible");
     }
 
     // do collision
@@ -272,15 +269,7 @@ fn do_wall_collision(
             }
         }
     }
-
-    if distance.distance_to_travel > 0.0 {
-        // propagate along chosen direction
-        atom_pos.pos =
-            collision.collision_point + atom_vel.vel.normalize() * distance.distance_to_travel;
-    } else {
-        atom_pos.pos = collision.collision_point;
-    }
-    // Return time used
+    atom_pos.pos = collision.collision_point + atom_vel.vel * (dt - time.0);
     traveled / atom_vel.vel.norm()
 }
 
@@ -292,7 +281,7 @@ pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
         (
             &mut Position,
             &mut Velocity,
-            &mut DistanceToTravel,
+            &mut TimeElapsed,
             &mut NumberOfWallCollisions,
             &VolumeStatus,
         ),
@@ -311,67 +300,65 @@ pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
     atom_query
         .par_iter_mut()
         .batching_strategy(batch_strategy.0.clone())
-        .for_each(
-            |(mut pos, mut vel, mut distance, mut collisions, location)| {
-                let mut dt_atom = dt;
-                let mut num_of_collisions = 0;
+        .for_each(|(mut pos, mut vel, mut time, mut collisions, location)| {
+            let mut dt_atom = dt;
+            let mut num_of_collisions = 0;
 
-                while distance.distance_to_travel > 0.0 && num_of_collisions < 10000 {
-                    let mut collided = false;
-                    for (shape, wall, wall_pos) in &walls {
-                        if let Some(collision_info) = collision_check(
-                            (&pos, &vel, location),
-                            (*shape, *wall_pos),
-                            dt_atom,
-                            tolerance,
-                            max_steps,
-                        ) {
-                            // Handle the collision
-                            let time_used = do_wall_collision(
-                                (&mut pos, &mut vel, &mut distance, &mut collisions),
-                                wall,
-                                &collision_info,
-                                &distribution,
-                                dt_atom,
-                                tolerance,
-                            );
-                            collided = true;
-                            dt_atom -= time_used;
-                            if dt_atom < 0.0 {
-                                dt_atom = 0.0;
-                                // eprintln!("Time set to a negative value somehow, wall collision system");
-                            }
+            while time.0 < dt && num_of_collisions < 10000 {
+                let mut collided = false;
+                for (shape, wall, wall_pos) in &walls {
+                    if let Some(collision_info) = collision_check(
+                        (&pos, &vel, location),
+                        (*shape, *wall_pos),
+                        dt_atom,
+                        tolerance,
+                        max_steps,
+                    ) {
+                        let distance = (dt - time.0) * vel.vel.norm();
+                        // print!(
+                        //     "distance: {}, position:{}, velocity:{}, collision point:{}",
+                        //     distance, pos.pos, vel.vel, collision_info.collision_point
+                        // );
+                        // Handle the collision
+                        let time_used = do_wall_collision(
+                            (&mut pos, &mut vel, &mut time, &mut collisions),
+                            wall,
+                            &collision_info,
+                            &distribution,
+                            dt,
+                        );
+                        collided = true;
+                        dt_atom -= time_used;
+                        if dt_atom < 0.0 {
+                            dt_atom = 0.0
                         }
                     }
-
-                    if !collided {
-                        break;
-                    }
-                    num_of_collisions += 1;
                 }
-            },
-        );
+
+                if !collided {
+                    break;
+                }
+                num_of_collisions += 1;
+            }
+        });
 }
 
 /// Updates distance to travel component for atoms
-/// If an atom doesn't have DistanceToTravel, it will be initialized
+/// If an atom doesn't have TimeElapsed, it will be initialized
 /// Otherwise, it will be reset for the next frame
-pub fn update_distance_to_travel_system(
-    mut query_new: Query<(Entity, &Velocity), (With<Atom>, Without<DistanceToTravel>)>,
-    mut query_existing: Query<(&Velocity, &mut DistanceToTravel), With<Atom>>,
+pub fn clear_time_elapsed_system(
+    mut query_new: Query<Entity, (With<Atom>, Without<TimeElapsed>)>,
+    mut query_existing: Query<&mut TimeElapsed, With<Atom>>,
     mut commands: Commands,
-    timestep: Res<Timestep>,
 ) {
     // Initialize for new atoms
-    for (atom_entity, vel) in query_new.iter_mut() {
-        commands.entity(atom_entity).insert(DistanceToTravel {
-            distance_to_travel: vel.vel.norm() * timestep.delta,
-        });
+    for atom_entity in query_new.iter_mut() {
+        commands.entity(atom_entity).insert(TimeElapsed(0.0));
     }
 
     // Reset for existing atoms
-    for (vel, mut distance) in query_existing.iter_mut() {
-        distance.distance_to_travel = vel.vel.norm() * timestep.delta;
+    for mut time_elapsed in query_existing.iter_mut() {
+        time_elapsed.0 = 0.0;
     }
 }
 
@@ -540,18 +527,12 @@ mod tests {
         let velocity = Velocity {
             vel: Vector3::new(2.0, 2.0, 0.0),
         };
-        let length = velocity.vel.norm() * dt;
-        let distance = DistanceToTravel {
-            distance_to_travel: length,
-        };
         let atom = app
             .world_mut()
             .spawn(Atom)
             .insert(position.clone())
             .insert(velocity.clone())
-            .insert(DistanceToTravel {
-                distance_to_travel: length,
-            })
+            .insert(TimeElapsed(0.0))
             .insert(NumberOfWallCollisions { value: 0 })
             .insert(VolumeStatus::Inside)
             .id();
@@ -564,15 +545,14 @@ mod tests {
             mut query: Query<(
                 &mut Position,
                 &mut Velocity,
-                &mut DistanceToTravel,
+                &mut TimeElapsed,
                 &mut NumberOfWallCollisions,
             )>,
             wall: Query<&WallData>,
             distribution: Res<LambertianProbabilityDistribution>,
-            tolerance: Res<SurfaceThreshold>,
         ) {
             query.iter_mut().for_each(
-                |(mut atom_pos, mut atom_vel, mut distance, mut collisions)| {
+                |(mut atom_pos, mut atom_vel, mut time_elapsed, mut collisions)| {
                     for wall in wall.iter() {
                         let dt = 1.0 - 1e-10; // If you change this make sure to change the dt above as well
                         let collision_point = Vector3::new(0.0, 0.0, 0.0);
@@ -581,26 +561,24 @@ mod tests {
                             collision_point,
                             collision_normal,
                         };
-                        let time_used = do_wall_collision(
-                            (&mut atom_pos, &mut atom_vel, &mut distance, &mut collisions),
+                        do_wall_collision(
+                            (
+                                &mut atom_pos,
+                                &mut atom_vel,
+                                &mut time_elapsed,
+                                &mut collisions,
+                            ),
                             wall,
                             &collision_info,
                             &distribution,
                             dt,
-                            tolerance.0,
                         );
-                        assert_approx_eq!(
-                            time_used,
-                            ((atom_pos.pos - atom_vel.vel * dt) - collision_point).norm()
-                                / atom_vel.vel.norm()
-                        )
                     }
                 },
             );
         }
         app.add_systems(Startup, create_cosine_distribution);
         app.add_systems(Update, test_system);
-        app.world_mut().insert_resource(SurfaceThreshold(1e-9));
         app.update();
 
         let new_velocity = app
@@ -615,12 +593,6 @@ mod tests {
             .get::<Position>()
             .expect("Entity not found")
             .pos;
-        let new_distance = app
-            .world()
-            .entity(atom)
-            .get::<DistanceToTravel>()
-            .expect("Entity not found")
-            .distance_to_travel;
         let new_number_of_wall_collisions = app
             .world()
             .entity(atom)
@@ -630,7 +602,6 @@ mod tests {
 
         let time_used =
             ((position.pos - velocity.vel * dt) - collision_point).norm() / velocity.vel.norm();
-        let distance_travelled = ((position.pos - velocity.vel * dt) - collision_point).norm();
 
         assert_ne!(new_velocity, velocity.vel);
         assert_eq!(new_number_of_wall_collisions, 1);
@@ -647,11 +618,6 @@ mod tests {
         assert_approx_eq!(
             new_position[2],
             collision_point[2] + new_velocity[2] * (dt - time_used),
-            1e-15
-        );
-        assert_approx_eq!(
-            distance.distance_to_travel - distance_travelled,
-            new_distance,
             1e-15
         );
     }
