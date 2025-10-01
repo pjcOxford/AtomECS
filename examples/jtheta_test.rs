@@ -23,11 +23,19 @@ use std::time::Instant;
 
 fn main() {
     let now = Instant::now();
+
+    let number_to_emit = 1e10;
+    let radius = 25e-6;
+    let length = 1000e-6;
+    let direction = Vector3::new(1.0, 0.0, 0.0);
+    let interval = 10;
+    let timestep = 1e-7;
+
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(AtomSourcePlugin::<Strontium88>::default());
     sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new(
         "vel.txt".to_string(),
-        10,
+        interval,
     ));
     sim_builder.add_plugins(CollisionPlugin);
 
@@ -37,17 +45,10 @@ fn main() {
     sim.world_mut().insert_resource(ApplyWallCollisions(true));
     sim.insert_resource(MarkerConfig {
         pos_range: vec![(0.0, f64::MAX), (f64::MIN, f64::MAX), (f64::MIN, f64::MAX)],
-        vel_range: vec![
-            (f64::MIN, f64::MAX),
-            (f64::MIN, f64::MAX),
-            (f64::MIN, f64::MAX),
-        ],
+        ..Default::default()
     });
     sim.insert_resource(WriteOnce(true));
-    sim.insert_resource(Interval(10));
-
-    let radius = 25e-6;
-    let length = 1000e-6;
+    sim.insert_resource(Interval(interval));
 
     sim.world_mut()
         .spawn(WallData {
@@ -55,29 +56,19 @@ fn main() {
             wall_temp: Some(700.0),
             ..Default::default()
         })
-        .insert(CylindricalPipe::new(
-            radius,
-            length,
-            Vector3::new(1.0, 0.0, 0.0),
-        ))
+        .insert(CylindricalPipe::new(radius, length, direction))
         .insert(Position {
-            pos: Vector3::new(-length / 2.0, 0.0, 0.0),
+            pos: direction * -length / 2.0,
         });
 
     sim.world_mut()
         .spawn(SimulationVolume {
             volume_type: VolumeType::Inclusive,
         })
-        .insert(MyCylinder::new(
-            1500e-6,
-            2000e-6,
-            Vector3::new(1.0, 0.0, 0.0),
-        ))
+        .insert(MyCylinder::new(1500e-6, 2000e-6, direction))
         .insert(Position {
             pos: Vector3::new(000e-6, 0.0, 0.0),
         });
-
-    let number_to_emit = 1e10;
 
     let mut thetas = Vec::<f64>::new();
     let mut weights = Vec::<f64>::new();
@@ -99,7 +90,7 @@ fn main() {
                 radius,
                 thickness: 1e-9,
             },
-            direction: Vector3::new(1.0, 0.0, 0.0),
+            direction: direction,
             theta_distribution: uniform_distribution,
             max_theta: PI / 2.0,
             phantom: PhantomData,
@@ -117,7 +108,8 @@ fn main() {
         });
 
     // Define timestep
-    sim.world_mut().insert_resource(Timestep { delta: 1e-7 });
+    sim.world_mut()
+        .insert_resource(Timestep { delta: timestep });
     sim.world_mut()
         .insert_resource(VelocityCap { value: f64::MAX });
 

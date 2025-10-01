@@ -164,10 +164,11 @@ fn collision_check<T: Wall + Intersect + Normal>(
         if let Some(mut collision_normal) =
             shape.calculate_normal(&collision_point, &wall_pos.pos, tolerance)
         {
-            collision_point += 1e-10 * collision_normal; // Offset collision point along normal to avoid numerical issues
             if collision_normal.dot(&vel.vel) >= 0.0 {
                 collision_normal = -collision_normal; // Ensure normal is against velocity
             }
+            collision_point += 1e-10 * collision_normal; // Offset collision point along normal to avoid numerical issues
+
             Some(CollisionInfo {
                 collision_point,
                 collision_normal,
