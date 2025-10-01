@@ -1,10 +1,10 @@
 //! Support for analytically defined fields.
 
 use super::MagneticFieldSampler;
-use crate::{atom::Position, integrator::AtomECSBatchStrategy};
+use crate::atom::Position;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use nalgebra::{Matrix3, Vector3};
-
 pub trait AnalyticField {
     /// Calculates the magnetic field.
     ///
@@ -22,14 +22,13 @@ pub trait AnalyticField {
 pub fn calculate_field_contributions<T>(
     fields_query: Query<(&Position, &T)>,
     mut samplers_query: Query<(&Position, &mut MagneticFieldSampler)>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) where
     T: AnalyticField + Component,
 {
     for (origin, field) in fields_query.iter() {
         samplers_query
             .par_iter_mut()
-            .batching_strategy(batch_strategy.0.clone())
+            .batching_strategy(BatchingStrategy::new())
             .for_each(|(pos, mut sampler)| {
                 // calculate field contribution
                 sampler.field += field.get_field(origin.pos, pos.pos);

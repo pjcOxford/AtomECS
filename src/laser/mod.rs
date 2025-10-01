@@ -83,17 +83,13 @@ mod tests {
     /// Test samplers are added to [NewlyCreated] entities.
     #[test]
     fn test_components_added_to_new_atoms() {
-        use crate::{
-            integrator::AtomECSBatchStrategy,
-            laser::{
-                intensity::LaserIntensitySamplers,
-                intensity_gradient::LaserIntensityGradientSamplers,
-            },
+        use crate::laser::{
+            intensity::LaserIntensitySamplers, intensity_gradient::LaserIntensityGradientSamplers,
         };
         const LASER_SIZE: usize = 4;
 
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
+
         app.add_plugins(LaserPlugin::<LASER_SIZE>);
 
         let test_entity = app.world_mut().spawn(NewlyCreated).id();

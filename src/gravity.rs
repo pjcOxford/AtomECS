@@ -2,10 +2,9 @@
 
 use crate::atom::{Force, Mass};
 use crate::constant;
-use crate::integrator::AtomECSBatchStrategy;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use nalgebra::Vector3;
-
 /// A resource that indicates that the simulation should apply the force of gravity.
 #[derive(Resource, Default)]
 pub struct GravityConfiguration {
@@ -13,14 +12,13 @@ pub struct GravityConfiguration {
 }
 
 fn apply_gravitational_forces(
-    batch_strategy: Res<AtomECSBatchStrategy>,
     config: Res<GravityConfiguration>,
     mut query: Query<(&mut Force, &Mass)>,
 ) {
     if config.apply_gravity {
         query
             .par_iter_mut()
-            .batching_strategy(batch_strategy.0.clone())
+            .batching_strategy(BatchingStrategy::new())
             .for_each(|(mut force, mass)| {
                 force.force +=
                     mass.value * constant::AMU * constant::GC * Vector3::new(0., 0., -1.);
@@ -53,7 +51,6 @@ mod tests {
     fn test_apply_gravitational_force_system() {
         let mut simulation = App::new();
         simulation.add_plugins(GravityPlugin);
-        simulation.insert_resource(AtomECSBatchStrategy::default());
         let atom = simulation
             .world_mut()
             .spawn(Mass { value: 1.0 })

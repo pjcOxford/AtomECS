@@ -1,9 +1,9 @@
 use crate::atom::Force;
 use crate::dipole::DipoleLight;
 use crate::dipole::Polarizability;
-use crate::integrator::AtomECSBatchStrategy;
 use crate::laser::index::LaserIndex;
 use crate::laser::intensity_gradient::LaserIntensityGradientSamplers;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 
 /// Calculates forces exerted onto the atoms by dipole laser beams.
@@ -18,11 +18,10 @@ pub fn apply_dipole_force_system<const N: usize>(
         &mut Force,
     )>,
     laser_query: Query<(&DipoleLight, &LaserIndex)>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     atom_query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(polarizability, sampler, mut force)| {
             for (_dipole, index) in laser_query.iter() {
                 force.force += polarizability.prefactor * sampler.contents[index.index].gradient;
@@ -38,7 +37,6 @@ mod tests {
     // use bevy::prelude::*;
     use crate::atom::Force;
     use crate::constant;
-    use crate::integrator::AtomECSBatchStrategy;
     use crate::laser;
     use crate::laser::gaussian::GaussianBeam;
     use crate::laser::intensity_gradient::sample_gaussian_laser_intensity_gradient;
@@ -50,7 +48,6 @@ mod tests {
     #[test]
     fn test_apply_dipole_force_system() {
         let mut test = App::new();
-        test.insert_resource(AtomECSBatchStrategy::default());
 
         let transition_linewidth = 32e6;
         let transition_lambda = 461e-9;
@@ -106,8 +103,6 @@ mod tests {
     fn test_apply_dipole_force_again_system() {
         let mut test = App::new();
 
-        test.insert_resource(AtomECSBatchStrategy::default());
-
         let transition_linewidth = 32e6;
         let transition_lambda = 461e-9;
 
@@ -154,8 +149,6 @@ mod tests {
     #[test]
     fn test_apply_dipole_force_and_gradient_system() {
         let mut test = App::new();
-
-        test.insert_resource(AtomECSBatchStrategy::default());
 
         let power = 10.0;
         let e_radius = 60.0e-6 / (2.0_f64.sqrt());

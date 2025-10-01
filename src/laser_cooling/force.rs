@@ -2,20 +2,19 @@
 
 use super::transition::TransitionComponent;
 use super::CoolingLight;
+use crate::atom::Force;
 use crate::constant;
+use crate::constant::HBAR;
+use crate::integrator::Timestep;
 use crate::laser::gaussian::GaussianBeam;
 use crate::laser::index::LaserIndex;
 use crate::laser_cooling::photons_scattered::ActualPhotonsScatteredVector;
+use crate::laser_cooling::repump::*;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use nalgebra::Vector3;
 use rand_distr;
 use rand_distr::{Distribution, Normal, UnitSphere};
-
-use crate::atom::Force;
-use crate::constant::HBAR;
-use crate::integrator::{AtomECSBatchStrategy, Timestep};
-
-use crate::laser_cooling::repump::*;
 
 const LASER_CACHE_SIZE: usize = 16;
 
@@ -28,7 +27,6 @@ const LASER_CACHE_SIZE: usize = 16;
 pub fn calculate_absorption_forces<const N: usize, T: TransitionComponent>(
     laser_query: Query<(&CoolingLight, &LaserIndex, &GaussianBeam)>,
     mut atom_query: Query<(&ActualPhotonsScatteredVector<T, N>, &mut Force), Without<Dark>>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
     timestep: Res<Timestep>,
 ) {
     // There are typically only a small number of lasers in a simulation.
@@ -50,7 +48,7 @@ pub fn calculate_absorption_forces<const N: usize, T: TransitionComponent>(
 
         atom_query
             .par_iter_mut()
-            .batching_strategy(batch_strategy.0.clone())
+            .batching_strategy(BatchingStrategy::new())
             .for_each(|(scattered, mut force)| {
                 for (cooling, index, gaussian) in laser_array.iter().take(number_in_iteration) {
                     let new_force = scattered.contents[index.index].scattered * HBAR
@@ -99,7 +97,6 @@ pub struct EmissionForceConfiguration {
 /// produced or derived by random-walk formula and a single random unit vector.
 pub fn calculate_emission_forces<const N: usize, T: TransitionComponent>(
     mut atom_query: Query<(&mut Force, &ActualPhotonsScatteredVector<T, N>), With<T>>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
     rand_opt: Option<Res<EmissionForceOption>>,
     timestep: Res<Timestep>,
 ) {
@@ -111,7 +108,7 @@ pub fn calculate_emission_forces<const N: usize, T: TransitionComponent>(
                 EmissionForceOption::On(configuration) => {
                     atom_query
                         .par_iter_mut()
-                        .batching_strategy(batch_strategy.0.clone())
+                        .batching_strategy(BatchingStrategy::new())
                         .for_each(|(mut force, kick)| {
                             let total: u64 = kick.calculate_total_scattered();
                             let mut rng = rand::rng();
@@ -169,7 +166,6 @@ mod tests {
         let mut app = App::new();
 
         let time_delta = 1.0e-5;
-        app.insert_resource(AtomECSBatchStrategy::default());
         app.insert_resource(Timestep { delta: time_delta });
 
         let wavelength = Strontium88_461::wavelength();
@@ -225,7 +221,6 @@ mod tests {
     #[test]
     fn test_apply_emission_forces_system() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
         let time_delta = 1.0e-5;
         app.insert_resource(Timestep { delta: time_delta });
 

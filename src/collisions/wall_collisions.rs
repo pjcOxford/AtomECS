@@ -11,11 +11,12 @@ use crate::collisions::wall_collision_info::*;
 use crate::collisions::NumberOfWallCollisions;
 use crate::constant::{AMU, EXP, PI};
 use crate::initiate::NewlyCreated;
-use crate::integrator::{AtomECSBatchStrategy, Timestep};
+use crate::integrator::Timestep;
 use crate::probability_distribution::WeightedProbabilityDistribution;
 use crate::shapes::{
     Cuboid as MyCuboid, Cylinder as MyCylinder, CylindricalPipe, Sphere as MySphere, Volume,
 }; // Aliasing issues with bevy.
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use nalgebra::Vector3;
 use rand::distr::Distribution;
@@ -322,7 +323,6 @@ pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
         ),
         With<Atom>,
     >,
-    batch_strategy: Res<AtomECSBatchStrategy>,
     timestep: Res<Timestep>,
     threshold: Res<SurfaceThreshold>,
     max_steps: Res<MaxSteps>,
@@ -334,7 +334,7 @@ pub fn wall_collision_system<T: Wall + Component + Intersect + Normal>(
     let walls: Vec<_> = wall_query.iter().collect();
     atom_query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(mut pos, mut vel, mut time, mut collisions, location)| {
             let mut num_of_collisions = 0;
 

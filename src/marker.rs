@@ -1,8 +1,8 @@
 use crate::atom::{Atom, Position, Velocity};
 use crate::collisions::CollisionsSet;
-use crate::integrator::{AtomECSBatchStrategy, Step};
+use crate::integrator::Step;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
-
 #[derive(PartialEq, Eq)]
 pub enum WriteOrNot {
     Write,
@@ -62,11 +62,10 @@ fn update_marker_system(
     mut query_new: Query<(Entity, &Position, &Velocity), (With<Atom>, Without<Marker>)>,
     mut query_existing: Query<(&Position, &Velocity, &mut Marker)>,
     config: Res<MarkerConfig>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     query_existing
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(pos, vel, mut marker)| match marker.write_status {
             WriteOrNot::Write => {
                 if !is_in_range(pos, vel, &config) {

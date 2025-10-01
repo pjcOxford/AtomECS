@@ -1,14 +1,12 @@
 //! Shift in an atom's transition frequency due to a magnetic field (zeeman effect)
-use std::marker::PhantomData;
-
+use super::transition::TransitionComponent;
 use crate::constant::HBAR;
 use crate::initiate::NewlyCreated;
-use crate::integrator::AtomECSBatchStrategy;
 use crate::magnetic::MagneticFieldSampler;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use serde::Serialize;
-
-use super::transition::TransitionComponent;
+use std::marker::PhantomData;
 
 /// Represents the (angular) Zeeman shift of the atom depending on the magnetic field it experiences
 #[derive(Clone, Copy, Serialize, Component)]
@@ -55,13 +53,12 @@ pub fn attach_zeeman_shift_samplers_to_newly_created_atoms<T>(
 /// Calculates the Zeeman shift for each atom in each cooling beam.
 pub fn calculate_zeeman_shift<T>(
     mut query: Query<(&mut ZeemanShiftSampler<T>, &MagneticFieldSampler), With<T>>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) where
     T: TransitionComponent,
 {
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(mut zeeman, magnetic_field)| {
             zeeman.sigma_plus = T::mup() / HBAR * magnetic_field.magnitude;
             zeeman.sigma_minus = T::mum() / HBAR * magnetic_field.magnitude;
@@ -82,7 +79,7 @@ mod tests {
     #[test]
     fn test_calculate_zeeman_shift_system() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
+
         let atom = app
             .world_mut()
             .spawn(MagneticFieldSampler {
@@ -125,7 +122,7 @@ mod tests {
     #[test]
     fn test_attach_zeeman_sampler_to_newly_created_atoms() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
+
         let atom = app
             .world_mut()
             .spawn(NewlyCreated)

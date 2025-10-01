@@ -12,10 +12,10 @@
 //!   * The struct implements `Clone`.
 //!   * The fields can all be multiplied by an f64 and added (eg `f64` and `Vector3<f64>` types).
 
+use crate::integrator::{Step, Timestep};
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::ecs::component::Mutable;
 use bevy::prelude::*;
-
-use crate::integrator::{AtomECSBatchStrategy, Step, Timestep};
 use std::marker::PhantomData;
 
 pub trait Lerp<T> {
@@ -68,18 +68,14 @@ where
     }
 }
 
-fn apply_ramp<T>(
-    mut query: Query<(&mut T, &mut Ramp<T>)>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
-    timestep: Res<Timestep>,
-    step: Res<Step>,
-) where
+fn apply_ramp<T>(mut query: Query<(&mut T, &mut Ramp<T>)>, timestep: Res<Timestep>, step: Res<Step>)
+where
     T: Lerp<T> + Component<Mutability = Mutable> + Sync + Send + Clone,
 {
     let current_time = step.n as f64 * timestep.delta;
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(mut comp, mut ramp)| {
             comp.clone_from(&ramp.get_value(current_time));
         });

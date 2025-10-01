@@ -31,20 +31,19 @@ impl Default for Timestep {
     }
 }
 
-#[derive(Resource, Clone)]
-pub struct AtomECSBatchStrategy(pub BatchingStrategy);
-impl Default for AtomECSBatchStrategy {
-    fn default() -> Self {
-        AtomECSBatchStrategy(BatchingStrategy::fixed(1024))
-    }
-}
+// #[derive(Resource, Clone)]
+// pub struct AtomECSBatchStrategy(pub BatchingStrategy);
+// impl Default for AtomECSBatchStrategy {
+//     fn default() -> Self {
+//         AtomECSBatchStrategy(BatchingStrategy::fixed(1024))
+//     }
+// }
 
 /// Integrates position using a velocity-verlet integration approach.
 /// Stores the value of [Force] from the previous frame in the [OldForce] component.
 ///
 /// The timestep duration is specified by the [Timestep] system resource.
 fn velocity_verlet_integrate_position(
-    batch_strategy: Res<AtomECSBatchStrategy>,
     timestep: Res<Timestep>,
     mut step: ResMut<Step>,
     mut query: Query<(&mut Position, &mut OldForce, &Velocity, &Force, &Mass)>,
@@ -54,7 +53,7 @@ fn velocity_verlet_integrate_position(
 
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(mut pos, mut old_force, vel, force, mass)| {
             pos.pos += vel.vel * dt + force.force / (AMU * mass.value) / 2.0 * dt * dt;
             old_force.0 = *force;
@@ -65,14 +64,13 @@ fn velocity_verlet_integrate_position(
 ///
 /// The timestep duration is specified by the [Timestep] system resource
 fn velocity_verlet_integrate_velocity(
-    batch_strategy: Res<AtomECSBatchStrategy>,
     timestep: Res<Timestep>,
     mut query: Query<(&mut Velocity, &Force, &OldForce, &Mass)>,
 ) {
     let dt = timestep.delta;
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(mut vel, force, old_force, mass)| {
             vel.vel += (force.force + old_force.0.force) / (AMU * mass.value) / 2.0 * dt;
         });
@@ -89,10 +87,10 @@ fn add_old_force_to_new_atoms(
 }
 
 /// Resets force to zero at the start of each simulation step.
-fn clear_force(mut query: Query<&mut Force>, batch_strategy: Res<AtomECSBatchStrategy>) {
+fn clear_force(mut query: Query<&mut Force>) {
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|mut force| {
             force.force = Vector3::new(0.0, 0.0, 0.0);
         });
@@ -112,8 +110,6 @@ pub enum IntegrationSet {
 pub struct IntegrationPlugin;
 impl Plugin for IntegrationPlugin {
     fn build(&self, app: &mut App) {
-        app.world_mut()
-            .insert_resource(AtomECSBatchStrategy::default());
         app.world_mut().insert_resource(Step::default());
         app.world_mut().insert_resource(Timestep::default());
         // By default, systems are added to CoreSet::Update. We want our integrator to sandwich either side of these.

@@ -2,18 +2,17 @@
 
 extern crate serde;
 
-use std::marker::PhantomData;
-
 use super::transition::TransitionComponent;
 use super::CoolingLight;
-use crate::integrator::AtomECSBatchStrategy;
 use crate::laser::gaussian::GaussianBeam;
 use crate::laser::index::LaserIndex;
 use crate::laser::intensity::LaserIntensitySamplers;
 use crate::laser_cooling::sampler::LaserDetuningSamplers;
 use crate::magnetic::MagneticFieldSampler;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use serde::Serialize;
+use std::marker::PhantomData;
 
 /// Represents the rate coefficient of the atom with respect to a specific [CoolingLight] entity, for the given transition.
 #[derive(Clone, Copy, Serialize)]
@@ -68,14 +67,13 @@ pub fn calculate_rate_coefficients<const N: usize, T>(
         ),
         With<T>,
     >,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) where
     T: TransitionComponent,
 {
     // First set all rate coefficients to zero.
     atom_query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(_, _, _, mut rates)| {
             rates.contents = [RateCoefficient::default(); N];
         });
@@ -84,7 +82,7 @@ pub fn calculate_rate_coefficients<const N: usize, T>(
     for (cooling, index, gaussian) in laser_query.iter() {
         atom_query
             .par_iter_mut()
-            .batching_strategy(batch_strategy.0.clone())
+            .batching_strategy(BatchingStrategy::new())
             .for_each(|(detunings, intensities, bfield, mut rates)| {
                 let beam_direction_vector = gaussian.direction.normalize();
                 let costheta = if bfield.field.norm_squared() < (10.0 * f64::EPSILON) {
@@ -137,7 +135,7 @@ mod tests {
     #[test]
     fn test_calculate_rate_coefficients_system() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
+
         let wavelength = 461e-9;
         app.world_mut()
             .spawn(CoolingLight {

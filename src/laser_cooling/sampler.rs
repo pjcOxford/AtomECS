@@ -4,14 +4,13 @@ use super::transition::TransitionComponent;
 use super::zeeman::ZeemanShiftSampler;
 use super::CoolingLight;
 use crate::constant;
-use crate::integrator::AtomECSBatchStrategy;
 use crate::laser::index::LaserIndex;
 use crate::laser_cooling::doppler::DopplerShiftSamplers;
 use bevy::prelude::*;
 use std::f64;
 use std::marker::PhantomData;
 extern crate nalgebra;
-
+use bevy::ecs::batching::BatchingStrategy;
 const LASER_CACHE_SIZE: usize = 16;
 
 /// Represents total detuning of the atom's transition with respect to each beam
@@ -64,7 +63,6 @@ pub fn calculate_laser_detuning<const N: usize, T: TransitionComponent>(
         ),
         With<T>,
     >,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     // There are typically only a small number of lasers in a simulation.
     // For a speedup, cache the required components into thread memory,
@@ -85,7 +83,7 @@ pub fn calculate_laser_detuning<const N: usize, T: TransitionComponent>(
 
         atom_query
             .par_iter_mut()
-            .batching_strategy(batch_strategy.0.clone())
+            .batching_strategy(BatchingStrategy::new())
             .for_each(|(mut detuning_sampler, doppler_samplers, zeeman_sampler)| {
                 for (index, cooling) in laser_array.iter().take(number_in_iteration) {
                     let without_zeeman =
@@ -115,7 +113,7 @@ mod tests {
     #[test]
     fn test_calculate_laser_detuning_system() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
+
         let wavelength = constant::C / Strontium88_461::frequency();
         app.world_mut()
             .spawn(CoolingLight {

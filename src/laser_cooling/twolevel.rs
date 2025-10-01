@@ -1,13 +1,11 @@
 //! Calculation of the steady-state twolevel populations
 
-use crate::integrator::AtomECSBatchStrategy;
-
+use super::transition::TransitionComponent;
 use super::{rate::RateCoefficients, sampler_masks::CoolingLaserSamplerMasks};
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{fmt, marker::PhantomData};
-
-use super::transition::TransitionComponent;
 
 /// Represents the steady-state population density of the excited state and ground state for a given atomic transition.
 #[derive(Deserialize, Serialize, Clone, Component)]
@@ -67,11 +65,10 @@ pub fn calculate_two_level_population<const N: usize, T: TransitionComponent>(
         ),
         With<T>,
     >,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     atom_query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(mut twolevel, mask, rates)| {
             let mut sum_rates: f64 = 0.;
 
@@ -103,7 +100,6 @@ mod tests {
     #[test]
     fn test_calculate_twolevel_population_system() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
 
         // this test runs with two lasers only and we have to tell this the mask
         let mut active_lasers = [CoolingLaserSamplerMask { filled: false }; LASER_COUNT];
@@ -153,7 +149,7 @@ mod tests {
     #[test]
     fn test_popn_high_intensity_limit() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
+
         // this test runs with two lasers only and we have to tell this the mask
         let mut active_lasers = [CoolingLaserSamplerMask { filled: true }; LASER_COUNT];
         active_lasers[0] = CoolingLaserSamplerMask { filled: true };

@@ -9,10 +9,9 @@
 
 use crate::atom::Position;
 use crate::initiate::NewlyCreated;
-use crate::integrator::AtomECSBatchStrategy;
 use crate::shapes::{Cuboid, Cylinder, Sphere, Volume};
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
-
 pub enum VolumeType {
     /// Entities within the volume are accepted
     Inclusive,
@@ -55,12 +54,11 @@ pub struct SimulationVolume {
 fn perform_region_tests<T: Volume + Component>(
     volume_query: Query<(&T, &SimulationVolume, &Position)>,
     mut atom_query: Query<(&mut RegionTest, &Position)>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     for (volume, sim_volume, vol_pos) in volume_query.iter() {
         atom_query
             .par_iter_mut()
-            .batching_strategy(batch_strategy.0.clone())
+            .batching_strategy(BatchingStrategy::new())
             .for_each(|(mut result, pos)| match result.result {
                 Result::Reject => (),
                 _ => {
@@ -86,13 +84,10 @@ fn perform_region_tests<T: Volume + Component>(
 
 /// This system sets all [RegionTest](struct.RegionTest.html) results
 /// to the value `Result::Untested`.
-fn clear_region_tests(
-    mut query: Query<&mut RegionTest>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
-) {
+fn clear_region_tests(mut query: Query<&mut RegionTest>) {
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|mut test| test.result = Result::Untested);
 }
 
@@ -150,7 +145,6 @@ impl Plugin for SimulationRegionPlugin {
             )
                 .in_set(SimRegionSet::Set),
         );
-        app.init_resource::<AtomECSBatchStrategy>();
     }
 }
 
@@ -225,7 +219,6 @@ mod tests {
         }
 
         app.add_systems(Update, perform_region_tests::<Sphere>);
-        app.init_resource::<AtomECSBatchStrategy>();
         app.update();
 
         for (entity, result) in tests {
@@ -284,7 +277,6 @@ mod tests {
         }
 
         app.add_systems(Update, perform_region_tests::<Cuboid>);
-        app.init_resource::<AtomECSBatchStrategy>();
         app.update();
 
         for (entity, result) in tests {

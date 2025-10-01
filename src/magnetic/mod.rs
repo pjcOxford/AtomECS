@@ -1,9 +1,9 @@
 //! Magnetic fields and zeeman shift
 
+use crate::initiate::NewlyCreated;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use nalgebra::{Matrix3, Vector3};
-
-use crate::{initiate::NewlyCreated, integrator::AtomECSBatchStrategy};
 
 pub mod analytic;
 pub mod force;
@@ -60,13 +60,10 @@ impl Default for MagneticFieldSampler {
 }
 
 /// System that clears the magnetic field samplers each frame.
-fn clear_magnetic_field_sampler(
-    mut query: Query<&mut MagneticFieldSampler>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
-) {
+fn clear_magnetic_field_sampler(mut query: Query<&mut MagneticFieldSampler>) {
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|mut sampler| {
             sampler.magnitude = 0.;
             sampler.field = Vector3::new(0.0, 0.0, 0.0);
@@ -79,13 +76,10 @@ fn clear_magnetic_field_sampler(
 ///
 /// The magnetic field magnitude is frequently used, so it makes sense to calculate it once and cache the result.
 /// This system runs after all other magnetic field systems.
-pub fn calculate_magnetic_field_magnitude(
-    mut query: Query<&mut MagneticFieldSampler>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
-) {
+pub fn calculate_magnetic_field_magnitude(mut query: Query<&mut MagneticFieldSampler>) {
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|mut sampler| {
             sampler.magnitude = sampler.field.norm();
             if sampler.magnitude.is_nan() {
@@ -95,13 +89,10 @@ pub fn calculate_magnetic_field_magnitude(
 }
 
 /// Calculates the gradient of the magnitude of the magnetic field.
-fn calculate_magnetic_field_magnitude_gradient(
-    mut query: Query<&mut MagneticFieldSampler>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
-) {
+fn calculate_magnetic_field_magnitude_gradient(mut query: Query<&mut MagneticFieldSampler>) {
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|mut sampler| {
             let mut gradient = Vector3::new(0.0, 0.0, 0.0);
             for i in 0..3 {
@@ -167,14 +158,14 @@ mod tests {
     use super::*;
     use crate::{
         atom::Position,
-        integrator::{AtomECSBatchStrategy, Step, Timestep},
+        integrator::{Step, Timestep},
     };
 
     #[test]
     fn test_magnetics_plugin() {
         let mut app = App::new();
         app.add_plugins(MagneticsPlugin);
-        app.insert_resource(AtomECSBatchStrategy::default());
+
         app.insert_resource(Timestep::default());
         app.insert_resource(Step::default());
         //test_world.insert(crate::integrator::Step { n: 0 });
@@ -215,7 +206,7 @@ mod tests {
     fn test_field_samplers_are_added() {
         let mut app = App::new();
         app.insert_resource(Step { n: 0 });
-        app.insert_resource(AtomECSBatchStrategy::default());
+
         app.insert_resource(Timestep { delta: 1.0e-6 });
         app.add_plugins(MagneticsPlugin);
         let sampler_entity = app.world_mut().spawn(NewlyCreated).id();
@@ -232,7 +223,7 @@ mod tests {
     fn test_magnetic_gradient_system() {
         let mut app = App::new();
         app.insert_resource(Step { n: 0 });
-        app.insert_resource(AtomECSBatchStrategy::default());
+
         app.insert_resource(Timestep { delta: 1.0e-6 });
 
         let atom1 = app

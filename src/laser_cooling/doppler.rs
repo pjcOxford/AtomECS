@@ -3,9 +3,9 @@ use bevy::prelude::*;
 
 use super::CoolingLight;
 use crate::atom::Velocity;
-use crate::integrator::AtomECSBatchStrategy;
 use crate::laser::gaussian::GaussianBeam;
 use crate::laser::index::LaserIndex;
+use bevy::ecs::batching::BatchingStrategy;
 use serde::Serialize;
 
 const LASER_CACHE_SIZE: usize = 16;
@@ -31,12 +31,11 @@ impl Default for DopplerShiftSampler {
 pub fn calculate_doppler_shift<const N: usize>(
     laser_query: Query<(&CoolingLight, &LaserIndex, &GaussianBeam)>,
     mut atom_query: Query<(&mut DopplerShiftSamplers<N>, &Velocity)>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     // Set samplers to default values first.
     atom_query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(mut samplers, _vel)| {
             samplers.contents = [DopplerShiftSampler::default(); N];
         });
@@ -62,7 +61,7 @@ pub fn calculate_doppler_shift<const N: usize>(
 
         atom_query
             .par_iter_mut()
-            .batching_strategy(batch_strategy.0.clone())
+            .batching_strategy(BatchingStrategy::new())
             .for_each(|(mut sampler, vel)| {
                 for (cooling, index, gaussian) in laser_array.iter().take(number_in_iteration) {
                     sampler.contents[index.index].doppler_shift = vel
@@ -97,7 +96,6 @@ mod tests {
     #[test]
     fn test_calculate_doppler_shift_system() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
 
         let wavelength = 780e-9;
         app.world_mut()

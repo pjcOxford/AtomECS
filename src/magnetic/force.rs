@@ -8,9 +8,8 @@
 use super::MagneticFieldSampler;
 use crate::atom::Force;
 use crate::constant;
-use crate::integrator::AtomECSBatchStrategy;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
-
 /// Component that represents the magnetic dipole moment of an atom.
 #[derive(Clone, Component)]
 pub struct MagneticDipole {
@@ -20,11 +19,10 @@ pub struct MagneticDipole {
 
 pub fn apply_magnetic_forces(
     mut query: Query<(&mut Force, &MagneticFieldSampler, &MagneticDipole)>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(mut force, sampler, dipole)| {
             let dipole_force = -dipole.mFgF * constant::BOHRMAG * sampler.gradient;
             force.force += dipole_force;
@@ -43,7 +41,6 @@ mod tests {
     fn test_apply_magnetic_force_system() {
         let mut app = App::new();
         app.add_systems(Update, apply_magnetic_forces);
-        app.insert_resource(AtomECSBatchStrategy::default());
 
         let atom1 = app
             .world_mut()

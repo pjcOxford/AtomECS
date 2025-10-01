@@ -3,8 +3,8 @@
 use super::frame::Frame;
 use super::gaussian::{get_gaussian_beam_intensity, CircularMask, GaussianBeam};
 use crate::atom::Position;
-use crate::integrator::AtomECSBatchStrategy;
 use crate::laser::index::LaserIndex;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use serde::Serialize;
 
@@ -43,11 +43,10 @@ pub struct LaserIntensitySamplers<const N: usize> {
 /// * `N`: a constant `usize` corresponding to the size of the laser sampler array.
 pub fn initialise_laser_intensity_samplers<const N: usize>(
     mut query: Query<&mut LaserIntensitySamplers<N>>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|mut sampler| {
             sampler.contents = [LaserIntensitySampler::default(); N];
         })
@@ -64,7 +63,6 @@ pub fn sample_laser_intensities<const N: usize, FilterT>(
     mask_query: Query<&CircularMask>,
     frame_query: Query<&Frame>,
     mut sampler_query: Query<(&mut LaserIntensitySamplers<N>, &Position)>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) where
     FilterT: Component,
 {
@@ -105,7 +103,7 @@ pub fn sample_laser_intensities<const N: usize, FilterT>(
 
         sampler_query
             .par_iter_mut()
-            .batching_strategy(batch_strategy.0.clone())
+            .batching_strategy(BatchingStrategy::new())
             .for_each(|(mut samplers, pos)| {
                 for (index, gaussian, mask, frame) in laser_array.iter().take(number_in_iteration) {
                     samplers.contents[index.index].intensity =
@@ -131,7 +129,6 @@ mod tests {
     #[test]
     fn test_sample_laser_intensity_system() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
 
         app.world_mut()
             .spawn(LaserIndex {
@@ -189,7 +186,6 @@ mod tests {
     #[test]
     fn test_initialise_laser_intensity_samplers() {
         let mut app = App::new();
-        app.insert_resource(AtomECSBatchStrategy::default());
 
         let atom1 = app
             .world_mut()

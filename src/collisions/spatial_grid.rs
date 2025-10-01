@@ -1,6 +1,6 @@
 use crate::atom::{Atom, Position};
 use crate::collisions::atom_collisions::CollisionParameters;
-use crate::integrator::AtomECSBatchStrategy;
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use nalgebra::Vector3;
 
@@ -25,11 +25,10 @@ pub fn init_boxid_system(
 pub fn assign_boxid_system(
     mut query: Query<(&Position, &mut BoxID), With<Atom>>,
     params: Res<CollisionParameters>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     query
         .par_iter_mut()
-        .batching_strategy(batch_strategy.0.clone())
+        .batching_strategy(BatchingStrategy::new())
         .for_each(|(position, mut boxid)| {
             boxid.id = pos_to_id(position.pos, params.box_number, params.box_width);
         });

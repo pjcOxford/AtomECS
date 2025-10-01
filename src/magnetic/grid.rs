@@ -1,10 +1,10 @@
 //! Define magnetic fields using grids.
+use crate::atom::Position;
 use crate::magnetic::MagneticFieldSampler;
-use crate::{atom::Position, integrator::AtomECSBatchStrategy};
+use bevy::ecs::batching::BatchingStrategy;
 use bevy::prelude::*;
 use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
-
 /// Defines a magnetic field using a grid-based representation.
 ///
 /// The grid is ordered as a linear array, with elements ordered in priority z,y,x;
@@ -57,12 +57,11 @@ impl PrecalculatedMagneticFieldGrid {
 pub fn sample_magnetic_grids(
     grid_query: Query<&PrecalculatedMagneticFieldGrid>,
     mut sampler_query: Query<(&Position, &mut MagneticFieldSampler)>,
-    batch_strategy: Res<AtomECSBatchStrategy>,
 ) {
     for grid in grid_query.iter() {
         sampler_query
             .par_iter_mut()
-            .batching_strategy(batch_strategy.0.clone())
+            .batching_strategy(BatchingStrategy::new())
             .for_each(|(pos, mut sampler)| {
                 let field = grid.get_field(&pos.pos);
                 sampler.field += field;
