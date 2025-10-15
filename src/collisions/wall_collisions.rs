@@ -240,7 +240,7 @@ pub fn create_cosine_distribution(mut commands: Commands) {
 pub fn create_maxwellian_distribution(mut query: Query<&mut WallData>) {
     for mut wall in query.iter_mut() {
         if let Some(temp) = wall.wall_temp {
-            wall.speed_distribution = Some(create_v_distribution(temp, 88.0 * AMU, 2.0));
+            wall.speed_distribution = Some(create_v_distribution(temp, 87.0 * AMU, 3.0));
         }
     }
 }
