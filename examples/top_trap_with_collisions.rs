@@ -94,7 +94,6 @@ fn main() {
         .insert_resource(CrossSection { sigma: 3.5e-16 });
     sim.world_mut().insert_resource(CollisionsTracker {
         num_collisions: Vec::new(),
-        num_atoms: Vec::new(),
         num_particles: Vec::new(),
     });
 
@@ -114,7 +113,6 @@ fn main() {
                 &mut filename,
                 &_i,
                 &tracker.num_collisions,
-                &tracker.num_atoms,
                 &tracker.num_particles,
             )
             .expect("Could not write collision stats file.");
@@ -128,19 +126,16 @@ fn main() {
 fn write_collisions_tracker(
     filename: &mut File,
     step: &i32,
-    num_collisions: &Vec<i32>,
-    num_atoms: &Vec<f64>,
-    num_particles: &Vec<i32>,
+    num_collisions: &Vec<(i32, i64)>,
+    num_particles: &Vec<(i32, i64)>,
 ) -> Result<(), Error> {
-    let str_collisions: Vec<String> = num_collisions.iter().map(|n| n.to_string()).collect();
-    let str_atoms: Vec<String> = num_atoms.iter().map(|n| format!("{:.2}", n)).collect();
-    let str_particles: Vec<String> = num_particles.iter().map(|n| n.to_string()).collect();
+    let str_collisions: Vec<String> = num_collisions.iter().map(|(n, _)| n.to_string()).collect();
+    let str_particles: Vec<String> = num_particles.iter().map(|(n, _)| n.to_string()).collect();
     write!(
         filename,
-        "{:?}\r\n{:}\r\n{:}\r\n{:}\r\n",
+        "{:?}\r\n{:}\r\n{:}\r\n",
         step,
         str_collisions.join(" "),
-        str_atoms.join(" "),
         str_particles.join(" ")
     )?;
     Ok(())

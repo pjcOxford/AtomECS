@@ -24,17 +24,30 @@ use std::time::Instant;
 fn main() {
     let now = Instant::now();
 
+    // Simulation parameters
     let number_to_emit = 1e10;
-    let radius = 25e-6;
-    let length = 1000e-6;
+    let oven_radius = 25e-6;
+    let oven_length = 1000e-6;
     let direction = Vector3::new(1.0, 0.0, 0.0);
     let interval = 10;
     let timestep = 1e-7;
+    let output_filename = "vel.txt".to_string();
+    let temp = 700.0;
+    let thickness = 1e-9;
+    let mass_ratio = vec![MassRatio {
+        mass: 88.0,
+        ratio: 1.0,
+    }];
+    let velocity_cap = f64::MAX;
+    let runsteps = 10000;
+    let sim_region_radius = 1500e-6;
+    let sim_region_length = 2000e-6;
+    let sim_region_pos = (sim_region_length / 2.0 - oven_length) * direction;
 
     let mut sim_builder = SimulationBuilder::default();
     sim_builder.add_plugins(AtomSourcePlugin::<Strontium88>::default());
     sim_builder.add_plugins(FileOutputPlugin::<Velocity, Text>::new(
-        "vel.txt".to_string(),
+        output_filename,
         interval,
     ));
     sim_builder.add_plugins(CollisionPlugin);
@@ -53,21 +66,24 @@ fn main() {
     sim.world_mut()
         .spawn(WallData {
             wall_type: WallType::Rough,
-            wall_temp: Some(700.0),
             ..Default::default()
         })
-        .insert(CylindricalPipe::new(radius, length, direction))
+        .insert(CylindricalPipe::new(oven_radius, oven_length, direction))
         .insert(Position {
-            pos: direction * -length / 2.0,
+            pos: direction * -oven_length / 2.0,
         });
 
     sim.world_mut()
         .spawn(SimulationVolume {
             volume_type: VolumeType::Inclusive,
         })
-        .insert(MyCylinder::new(1500e-6, 2000e-6, direction))
+        .insert(MyCylinder::new(
+            sim_region_radius,
+            sim_region_length,
+            direction,
+        ))
         .insert(Position {
-            pos: Vector3::new(000e-6, 0.0, 0.0),
+            pos: sim_region_pos,
         });
 
     let mut thetas = Vec::<f64>::new();
@@ -85,10 +101,10 @@ fn main() {
 
     sim.world_mut()
         .spawn(Oven::<Strontium88> {
-            temperature: 700.0,
+            temperature: temp,
             aperture: OvenAperture::Circular {
-                radius,
-                thickness: 1e-9,
+                radius: oven_radius,
+                thickness,
             },
             direction: direction,
             theta_distribution: uniform_distribution,
@@ -96,12 +112,9 @@ fn main() {
             phantom: PhantomData,
         })
         .insert(Position {
-            pos: Vector3::new(-length * 0.99999, 0.0, 0.0),
+            pos: Vector3::new(-oven_length * 0.99999, 0.0, 0.0),
         })
-        .insert(MassDistribution::new(vec![MassRatio {
-            mass: 88.0,
-            ratio: 1.0,
-        }]))
+        .insert(MassDistribution::new(mass_ratio))
         .insert(AtomNumberToEmit { number: 0 })
         .insert(EmitFixedRate {
             rate: number_to_emit,
@@ -110,11 +123,12 @@ fn main() {
     // Define timestep
     sim.world_mut()
         .insert_resource(Timestep { delta: timestep });
-    sim.world_mut()
-        .insert_resource(VelocityCap { value: f64::MAX });
+    sim.world_mut().insert_resource(VelocityCap {
+        value: velocity_cap,
+    });
 
     // Run the simulation for a number of steps.
-    for _i in 0..10_000 {
+    for _i in 0..runsteps {
         sim.update();
     }
     println!("Simulation completed in {} ms.", now.elapsed().as_millis());

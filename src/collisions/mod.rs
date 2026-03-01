@@ -68,7 +68,6 @@ impl Plugin for CollisionPlugin {
         app.world_mut().insert_resource(CollisionsTracker {
             num_collisions: Vec::new(),
             num_particles: Vec::new(),
-            num_atoms: Vec::new(),
         });
 
         // Atom Collision Systems

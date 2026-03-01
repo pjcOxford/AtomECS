@@ -30,9 +30,8 @@ pub struct CollisionBox {
     pub expected_collision_checks: f64,
     pub collision_number: i32,
     pub density: f64,
-    pub volume: f64,
-    pub atom_number: f64,
     pub particle_number: i32,
+    pub center: i64,
 }
 
 /// Resource that gives the collisional cross section in m^2
@@ -48,10 +47,9 @@ impl Default for CollisionBox {
             entity_velocities: Vec::new(),
             expected_collision_checks: 0.0,
             density: 0.0,
-            volume: 0.0,
-            atom_number: 0.0,
             collision_number: 0,
             particle_number: 0,
+            center: 0,
         }
     }
 }
@@ -61,7 +59,6 @@ impl CollisionBox {
     fn do_collisions(&mut self, params: CollisionParameters, sigma: f64, dt: f64) {
         let mut rng = rand::rng();
         self.particle_number = self.entity_velocities.len() as i32;
-        self.atom_number = self.particle_number as f64 * params.macroparticle;
 
         // Only one atom or less in box - no collisions.
         if self.particle_number <= 1 {
@@ -78,14 +75,14 @@ impl CollisionBox {
         // number of times we check for collisions is N*n*sigma*v*dt, where n is atom density and N is atom number
         // probability of any given pair of particles colliding is sigma*vrel/(sigma*vrel)_max, sigma cross section and vrel the relative speed
         // and since we assume these are identical particles we must divide by two since otherwise we count each collision twice
-        let density = self.atom_number / params.box_width.powi(3);
+        let density = self.particle_number as f64 * params.macroparticle / params.box_width.powi(3);
         self.expected_collision_checks =
             (self.particle_number as f64 - 1.0) * density * sigma * max_speed * dt;
-
         let mut num_checks_left: f64 = self.expected_collision_checks;
-
         if num_checks_left > params.collision_limit {
-            panic!("Number of collisions in a box in a single frame exceeds limit. Number of collisions={}, limit={}, particles={}.", num_checks_left, params.collision_limit, self.particle_number);
+            panic!("Number of collisions in a box in a single frame exceeds limit. 
+                Number of collisions={}, limit={}, particles={}, density={}, sigma={}, max speed={}, dt={}.", 
+                num_checks_left, params.collision_limit, self.particle_number, density, sigma, max_speed, dt);
         }
 
         while num_checks_left > 0.0 {
@@ -147,11 +144,9 @@ pub struct CollisionParameters {
 #[derive(Clone, Resource)]
 pub struct CollisionsTracker {
     /// number of collisions in each box
-    pub num_collisions: Vec<i32>,
+    pub num_collisions: Vec<(i32, i64)>,
     /// number of simulated particles in each box
-    pub num_particles: Vec<i32>,
-    /// number of simulated atoms in each box
-    pub num_atoms: Vec<f64>,
+    pub num_particles: Vec<(i32, i64)>,
 }
 
 /// Performs collisions within the atom cloud using a spatially partitioned Monte-Carlo approach.
@@ -169,8 +164,30 @@ pub fn apply_collisions_system(
         if boxid.id == i64::MAX {
             continue;
         } else {
+            // map.entry(boxid.id)
+            // .or_default()
+            // .entity_velocities
+            // .push((entity, velocity.vel));
             map.entry(boxid.id)
-                .or_default()
+                .or_insert_with(|| {
+                    // let n = params.box_number;
+                    // let id = boxid.id;
+
+                    // let z = id / (n * n);
+                    // let y = (id / n) % n;
+                    // let x = id % n;
+
+                    // let center = Vector3::new(
+                    //     (x as f64 + 0.5) * params.box_width,
+                    //     (y as f64 + 0.5) * params.box_width,
+                    //     (z as f64 + 0.5) * params.box_width,
+                    // );
+
+                    CollisionBox {
+                        center: boxid.id,
+                        ..Default::default()
+                    }
+                })
                 .entity_velocities
                 .push((entity, velocity.vel));
         }
@@ -193,17 +210,13 @@ pub fn apply_collisions_system(
     }
 
     // Update tracker
-    tracker.num_atoms = map
-        .values()
-        .map(|collision_box| collision_box.atom_number)
-        .collect();
     tracker.num_collisions = map
         .values()
-        .map(|collision_box| collision_box.collision_number)
+        .map(|collision_box| (collision_box.collision_number, collision_box.center))
         .collect();
     tracker.num_particles = map
         .values()
-        .map(|collision_box| collision_box.particle_number)
+        .map(|collision_box| (collision_box.particle_number, collision_box.center))
         .collect();
 }
 
@@ -308,7 +321,6 @@ mod tests {
             expected_collision += expected_number;
             actual_collision += collision_box.collision_number as f64;
             assert_eq!(collision_box.particle_number, 2 * MACRO_ATOM_NUMBER as i32);
-            assert_eq!(collision_box.atom_number, atom_number);
             if (collision_box.collision_number as f64 - expected_number).abs()
                 > expected_number * 0.10
             {
@@ -370,7 +382,6 @@ mod tests {
         sim.world_mut().insert_resource(Timestep { delta: dt });
         sim.world_mut().insert_resource(CollisionsTracker {
             num_collisions: Vec::new(),
-            num_atoms: Vec::new(),
             num_particles: Vec::new(),
         });
         sim.world_mut().insert_resource(CollisionParameters {
