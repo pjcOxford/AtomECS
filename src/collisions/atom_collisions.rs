@@ -164,29 +164,10 @@ pub fn apply_collisions_system(
         if boxid.id == i64::MAX {
             continue;
         } else {
-            // map.entry(boxid.id)
-            // .or_default()
-            // .entity_velocities
-            // .push((entity, velocity.vel));
             map.entry(boxid.id)
-                .or_insert_with(|| {
-                    // let n = params.box_number;
-                    // let id = boxid.id;
-
-                    // let z = id / (n * n);
-                    // let y = (id / n) % n;
-                    // let x = id % n;
-
-                    // let center = Vector3::new(
-                    //     (x as f64 + 0.5) * params.box_width,
-                    //     (y as f64 + 0.5) * params.box_width,
-                    //     (z as f64 + 0.5) * params.box_width,
-                    // );
-
-                    CollisionBox {
-                        center: boxid.id,
-                        ..Default::default()
-                    }
+                .or_insert_with(|| CollisionBox {
+                    center: boxid.id,
+                    ..Default::default()
                 })
                 .entity_velocities
                 .push((entity, velocity.vel));

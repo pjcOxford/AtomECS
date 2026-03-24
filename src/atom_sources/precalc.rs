@@ -31,7 +31,7 @@ pub fn create_v_distribution(
     let mut weights = Vec::<f64>::new();
 
     // precalculate the discretized distribution.
-    let n = 2000;
+    let n = 10000;
     for i in 0..n {
         let v = (i as f64 + 0.5) / (n as f64 + 1.0) * max_velocity;
         let weight = probability_v(temperature, mass, v, power);
