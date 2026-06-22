@@ -79,7 +79,6 @@ mod tests {
             .world_mut()
             .insert_resource(Timestep { delta: dt });
 
-        // add an atom to the world. We don't add force nor mass, because we don't need them.
         let atom = simulation
             .world_mut()
             .spawn(Position {

@@ -245,8 +245,8 @@ where
     }
 
     fn write_atom(writer: &mut W, atom: Entity, data: C) -> Result<(), io::Error> {
-        writer.write_u32::<Endianness>(atom.generation())?;
-        writer.write_u32::<Endianness>(atom.index())?;
+        writer.write_u32::<Endianness>(atom.generation().to_bits())?;
+        writer.write_u32::<Endianness>(atom.index().index())?;
         for element in data.data() {
             writer.write_f64::<Endianness>(element)?;
         }
